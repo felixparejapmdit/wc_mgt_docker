@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- SheetJS (xlsx) library for Excel file parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Chart.js for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -204,13 +206,12 @@
             object-fit: contain;
         }
         /* Card-specific styles */
-        .volunteer-card {
+        .volunteer-card, .attendance-card {
             background-color: #f0f9ff; /* Blue-50 */
             border: 1px solid #bfdbfe; /* Blue-200 */
             border-radius: 0.75rem;
             padding: 1rem;
             text-align: left;
-            cursor: pointer;
             transition: all 0.2s ease-in-out;
             box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.05);
             position: relative; /* Needed for absolute positioning of delete button */
@@ -218,7 +219,7 @@
             flex-direction: column;
             justify-content: space-between;
         }
-        .volunteer-card:hover {
+        .volunteer-card:hover, .attendance-card:hover {
             background-color: #e0f2fe; /* Blue-100 */
             transform: translateY(-2px);
             box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.1);
@@ -633,6 +634,7 @@
             <div class="mb-6 p-6 bg-purple-50 rounded-lg shadow-inner">
                 <h3 class="text-2xl font-semibold mb-4 text-gray-700">Submit New Request</h3>
                 <form id="requestForm" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <input type="hidden" id="requestId">
                     <div class="form-group">
                         <label for="requestVolunteerIdentifier">Volunteer (Assigned No. or Name):</label>
                         <input type="text" id="requestVolunteerIdentifier" class="mt-1" placeholder="Enter assigned number or name" list="volunteerDatalist" required>
@@ -781,6 +783,20 @@
             <button id="closeProjectHistoryModalBtn" class="btn-secondary">Close</button>
         </div>
     </div>
+    
+    <!-- Sheet Selection Modal -->
+    <div id="sheetSelectionModalOverlay" class="modal-overlay hidden"></div>
+    <div id="sheetSelectionModal" class="modal hidden">
+        <h3>Select Excel Sheet</h3>
+        <p>Please select the sheet you want to import:</p>
+        <div id="sheetSelectionContainer" class="modal-content">
+            <!-- Sheet options will be added here -->
+        </div>
+        <div class="flex justify-center mt-6">
+            <button id="cancelSheetSelectionBtn" class="btn-secondary">Cancel</button>
+        </div>
+    </div>
+
 
     <!-- Excel Import Mapping Modal -->
     <div id="importMappingModalOverlay" class="modal-overlay hidden"></div>
@@ -854,6 +870,7 @@
             let newVolunteersToImport = [];
             let duplicateVolunteersToProcess = [];
             let taskDataToImport = null;
+            window.workbookToImport = null; // To hold the entire workbook for sheet selection
 
             /**
              * Opens and sets up the IndexedDB database.
@@ -1000,6 +1017,42 @@
                 return age;
             }
 
+            function formatImportedDate(cellValue) {
+                if (!cellValue) return '';
+                
+                let date;
+                // If it's an Excel serial number
+                if (typeof cellValue === 'number') {
+                    const excelEpoch = new Date(1899, 11, 30);
+                    date = new Date(excelEpoch.getTime() + cellValue * 86400000);
+                } else {
+                    // If it's a string or already a Date object
+                    date = new Date(cellValue);
+                }
+
+                // Check if the date is valid
+                if (isNaN(date.getTime())) {
+                    return ''; // Return empty string for invalid dates
+                }
+                
+                // Adjust for timezone offset to prevent date shifts
+                date.setMinutes(date.getMinutes() + date.getTimezoneOffset());
+
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                
+                return `${year}-${month}-${day}`;
+            }
+            
+            function displayDate(isoDate) {
+                if (!isoDate || typeof isoDate !== 'string') return 'N/A';
+                const parts = isoDate.split('-');
+                if (parts.length !== 3) return isoDate; // Return original if not in expected format
+                const [year, month, day] = parts;
+                return `${day}-${month}-${year}`;
+            }
+
             // --- UI Functions ---
             function showMessageBox(title, message, isConfirm = false, onConfirmCallback = null, onCancelCallback = null) {
                 const messageBoxOverlay = document.getElementById('messageBoxOverlay');
@@ -1143,11 +1196,11 @@
                     document.getElementById('detailEmergencyContactPerson').textContent = volunteer.emergencyContactPerson || 'N/A';
                     document.getElementById('detailEmergencyContactNumber').textContent = volunteer.emergencyContactNumber || 'N/A';
                     document.getElementById('detailHomeAddress').textContent = volunteer.homeAddress || 'N/A';
-                    document.getElementById('detailBirthDate').textContent = volunteer.birthDate || 'N/A';
+                    document.getElementById('detailBirthDate').textContent = displayDate(volunteer.birthDate);
                     document.getElementById('detailMaritalStatus').textContent = volunteer.maritalStatus || 'N/A';
                     document.getElementById('detailSpouseName').textContent = volunteer.spouseName || 'N/A';
                     document.getElementById('detailSpouseContactNumber').textContent = volunteer.spouseContactNumber || 'N/A';
-                    document.getElementById('detailWeddingAnniversary').textContent = volunteer.weddingAnniversary || 'N/A';
+                    document.getElementById('detailWeddingAnniversary').textContent = displayDate(volunteer.weddingAnniversary);
                     document.getElementById('detailChurchCongregation').textContent = volunteer.churchCongregation || 'N/A';
 
                     const detailChildrenList = document.getElementById('detailChildren');
@@ -1350,7 +1403,7 @@
                         const row = attendanceRecordsBody.insertRow();
                         row.innerHTML = `
                             <td>${record.volunteerName}</td>
-                            <td>${record.date}</td>
+                            <td>${displayDate(record.date)}</td>
                             <td>
                                 <span class="px-2 py-1 rounded-full text-xs font-semibold ${record.status === 'Absent' ? 'bg-red-200 text-red-800' : 'bg-gray-200 text-gray-800'}">
                                     ${record.status}
@@ -1500,11 +1553,11 @@
                     }
                     requests.sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime());
                     requests.forEach(request => {
-                        const absentDatesDisplay = request.absentDates && request.absentDates.length > 0 ? request.absentDates.join(', ') : 'N/A';
+                        const absentDatesDisplay = request.absentDates && request.absentDates.length > 0 ? request.absentDates.map(displayDate).join(', ') : 'N/A';
                         const row = requestListBody.insertRow();
                         row.innerHTML = `
                             <td>${request.volunteerName}</td>
-                            <td>${request.requestDate}</td>
+                            <td>${displayDate(request.requestDate)}</td>
                             <td>${request.requestType}</td>
                             <td>${request.details}</td>
                             <td>${absentDatesDisplay}</td>
@@ -1667,23 +1720,60 @@
                 reader.onload = function(e) {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, {type: 'array'});
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
                     
-                    if (jsonData.length < 2) {
-                        showMessageBox('Error', 'The Excel file is empty or does not contain a header row.');
-                        return;
-                    }
+                    window.workbookToImport = workbook;
 
-                    const headers = jsonData[0];
-                    excelDataToImport = jsonData.slice(1);
-                    
-                    openMappingModal(headers);
+                    if (workbook.SheetNames.length > 1) {
+                        showSheetSelectionModal(workbook.SheetNames);
+                    } else {
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                        
+                        if (jsonData.length < 2) {
+                            showMessageBox('Error', 'The Excel file is empty or does not contain a header row.');
+                            return;
+                        }
+
+                        const headers = jsonData[0];
+                        excelDataToImport = jsonData.slice(1);
+                        openMappingModal(headers);
+                    }
                 };
                 reader.onerror = () => showMessageBox('Error', 'Failed to read the file.');
                 reader.readAsArrayBuffer(file);
                 event.target.value = '';
+            }
+
+            function showSheetSelectionModal(sheetNames) {
+                const container = document.getElementById('sheetSelectionContainer');
+                container.innerHTML = '';
+
+                sheetNames.forEach(sheetName => {
+                    const button = document.createElement('button');
+                    button.className = 'btn-primary w-full mb-2';
+                    button.textContent = sheetName;
+                    button.onclick = () => {
+                        document.getElementById('sheetSelectionModalOverlay').classList.add('hidden');
+                        document.getElementById('sheetSelectionModal').classList.add('hidden');
+                        
+                        const worksheet = window.workbookToImport.Sheets[sheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                        
+                        if (jsonData.length < 2) {
+                            showMessageBox('Error', 'The selected sheet is empty or does not contain a header row.');
+                            return;
+                        }
+
+                        const headers = jsonData[0];
+                        excelDataToImport = jsonData.slice(1);
+                        openMappingModal(headers);
+                    };
+                    container.appendChild(button);
+                });
+
+                document.getElementById('sheetSelectionModalOverlay').classList.remove('hidden');
+                document.getElementById('sheetSelectionModal').classList.remove('hidden');
             }
 
             function openMappingModal(headers) {
@@ -1758,8 +1848,8 @@
                 duplicateVolunteersToProcess = [];
 
                 for (const row of excelDataToImport) {
-                    const assignedNumber = row[mapping.assignedNumber] ? String(row[mapping.assignedNumber]) : null;
-                    const fullName = row[mapping.fullName] || '';
+                    const assignedNumber = row[mapping.assignedNumber] ? String(row[mapping.assignedNumber]).trim() : null;
+                    const fullName = row[mapping.fullName] ? String(row[mapping.fullName]).trim() : '';
                     if (!assignedNumber || !fullName) continue;
 
                     const volunteerData = {
@@ -1769,14 +1859,14 @@
                         trade: row[mapping.trade] || '',
                         maritalStatus: row[mapping.maritalStatus] || '',
                         homeAddress: row[mapping.homeAddress] || '',
-                        birthDate: row[mapping.birthDate] || '',
+                        birthDate: row[mapping.birthDate] ? formatImportedDate(row[mapping.birthDate]) : '',
                         bloodType: row[mapping.bloodType] || '',
                         medicalCondition: row[mapping.medicalCondition] || '',
                         emergencyContactPerson: row[mapping.emergencyContactPerson] || '',
                         emergencyContactNumber: row[mapping.emergencyContactNumber] || '',
                         spouseName: row[mapping.spouseName] || '',
                         spouseContactNumber: row[mapping.spouseContactNumber] || '',
-                        weddingAnniversary: row[mapping.weddingAnniversary] || '',
+                        weddingAnniversary: row[mapping.weddingAnniversary] ? formatImportedDate(row[mapping.weddingAnniversary]) : '',
                         churchCongregation: row[mapping.churchCongregation] || '',
                         children: [],
                         picture: ''
@@ -1830,6 +1920,7 @@
                 let updatedCount = 0;
                 let ignoredCount = 0;
                 let newCount = 0;
+                let skippedCount = excelDataToImport.length - (newVolunteersToImport.length + duplicateVolunteersToProcess.length);
 
                 // Process duplicates based on user choice
                 document.querySelectorAll('#duplicateListContainer > div').forEach((div, index) => {
@@ -1848,7 +1939,12 @@
                     newCount++;
                 }
                 
-                showMessageBox('Import Complete', `${newCount} new volunteers added, ${updatedCount} updated, and ${ignoredCount} ignored.`);
+                let summaryMessage = `${newCount} new volunteers added, ${updatedCount} updated, and ${ignoredCount} ignored.`;
+                if (skippedCount > 0) {
+                    summaryMessage += ` ${skippedCount} rows were skipped due to missing required data.`;
+                }
+
+                showMessageBox('Import Complete', summaryMessage);
                 document.getElementById('duplicateModalOverlay').classList.add('hidden');
                 document.getElementById('duplicateModal').classList.add('hidden');
                 loadAllData();
@@ -1954,6 +2050,7 @@
                 const deleteConfirmationInput = document.getElementById('deleteConfirmationInput');
                 const finalDeleteBtn = document.getElementById('finalDeleteBtn');
                 const cancelFinalDeleteBtn = document.getElementById('cancelFinalDeleteBtn');
+                const cancelSheetSelectionBtn = document.getElementById('cancelSheetSelectionBtn');
 
 
                 // --- Attach Event Listeners ---
@@ -2231,6 +2328,12 @@
                     document.getElementById('importMappingModalOverlay').classList.add('hidden');
                     document.getElementById('importMappingModal').classList.add('hidden');
                 });
+                 if (cancelSheetSelectionBtn) {
+                    cancelSheetSelectionBtn.addEventListener('click', () => {
+                        document.getElementById('sheetSelectionModalOverlay').classList.add('hidden');
+                        document.getElementById('sheetSelectionModal').classList.add('hidden');
+                    });
+                }
                 
                 // Duplicate Modal
                 confirmDuplicateChoicesBtn.addEventListener('click', finalizeImport);
