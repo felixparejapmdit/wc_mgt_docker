@@ -1,0 +1,2261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Construction Volunteer Management</title>
+    <!-- Tailwind CSS CDN for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS (xlsx) library for Excel file parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            color: #334155; /* Dark slate text */
+        }
+        .container {
+            width: 95%; /* Make container fluid */
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* Responsive padding for the container */
+        @media (min-width: 640px) { /* sm breakpoint */
+            .container {
+                padding: 1.5rem;
+            }
+        }
+        @media (min-width: 1024px) { /* lg breakpoint */
+            .container {
+                padding: 2rem;
+            }
+        }
+        /* Tailwind's max-width for very large screens */
+        .max-w-screen-2xl {
+            max-width: 1536px; /* Tailwind's default 2xl max-width */
+        }
+
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+        .tab-button.active {
+            background-color: #3b82f6; /* Blue-600 */
+            color: #ffffff;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5), 0 2px 4px -1px rgba(59, 130, 246, 0.25);
+        }
+        .tab-button:not(.active):hover {
+            background-color: #e0f2fe; /* Blue-50 */
+            color: #2563eb; /* Blue-700 */
+            border-color: #bfdbfe; /* Blue-200 */
+        }
+        .form-group label {
+            font-weight: 500;
+            color: #475569; /* Slate-600 */
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #cbd5e1; /* Slate-300 */
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            background-color: #f8fafc; /* Slate-50 */
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #3b82f6; /* Blue-500 */
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        .btn-primary {
+            background-color: #10b981; /* Emerald-500 */
+            color: #ffffff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.5), 0 2px 4px -1px rgba(16, 185, 129, 0.25);
+        }
+        .btn-primary:hover {
+            background-color: #059669; /* Emerald-600 */
+            transform: translateY(-1px);
+        }
+        .btn-secondary {
+            background-color: #64748b; /* Slate-500 */
+            color: #ffffff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(100, 116, 139, 0.5), 0 2px 4px -1px rgba(100, 116, 139, 0.25);
+        }
+        .btn-secondary:hover {
+            background-color: #475569; /* Slate-600 */
+            transform: translateY(-1px);
+        }
+        .btn-danger {
+            background-color: #ef4444; /* Red-500 */
+            color: #ffffff;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px -1px rgba(239, 68, 68, 0.5);
+        }
+        .btn-danger:hover {
+            background-color: #dc2626; /* Red-600 */
+            transform: translateY(-1px);
+        }
+        .table-auto {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+        }
+        .table-auto th, .table-auto td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0; /* Slate-200 */
+        }
+        .table-auto th {
+            background-color: #f1f5f9; /* Slate-100 */
+            font-weight: 600;
+            color: #475569; /* Slate-600 */
+        }
+        .table-auto tbody tr:hover {
+            background-color: #f8fafc; /* Slate-50 */
+        }
+        .message-box, .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #ffffff;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            text-align: center;
+            min-width: 300px;
+            max-width: 90%;
+            border: 1px solid #cbd5e1;
+        }
+        .message-box-overlay, .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .message-box h3, .modal h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #1e293b; /* Slate-800 */
+        }
+        .message-box p, .modal p {
+            margin-bottom: 1.5rem;
+            color: #475569; /* Slate-600 */
+        }
+        .message-box button, .modal button {
+            margin: 0 0.5rem;
+        }
+        .modal-content {
+            max-height: 70vh; /* Limit modal height */
+            overflow-y: auto; /* Enable scrolling for modal content */
+            text-align: left; /* Align text left within modal content */
+        }
+        .drop-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            background-color: #f8fafc;
+            color: #64748b;
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .drop-area.highlight {
+            background-color: #e0f2fe;
+            border-color: #3b82f6;
+        }
+        .image-preview {
+            max-width: 100%;
+            max-height: 150px;
+            margin-top: 1rem;
+            border-radius: 0.5rem;
+            object-fit: contain;
+        }
+        /* Card-specific styles */
+        .volunteer-card {
+            background-color: #f0f9ff; /* Blue-50 */
+            border: 1px solid #bfdbfe; /* Blue-200 */
+            border-radius: 0.75rem;
+            padding: 1rem;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.05);
+            position: relative; /* Needed for absolute positioning of delete button */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .volunteer-card:hover {
+            background-color: #e0f2fe; /* Blue-100 */
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.1);
+        }
+        .volunteer-card-picture {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 1rem;
+            border: 2px solid #3b82f6;
+            flex-shrink: 0;
+        }
+        .volunteer-card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .volunteer-card-info {
+             font-size: 0.8rem;
+             color: #475569;
+             margin-bottom: 0.25rem;
+             white-space: nowrap;
+             overflow: hidden;
+             text-overflow: ellipsis;
+        }
+        .volunteer-card-info strong {
+            color: #1e293b;
+        }
+         .volunteer-card-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .volunteer-card-delete-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background-color: #ef4444; /* Red-500 */
+            color: #ffffff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            transition: background-color 0.2s ease-in-out;
+            z-index: 10; /* Ensure it's above other card content */
+        }
+        .volunteer-card-delete-btn:hover {
+            background-color: #dc2626; /* Red-600 */
+        }
+        /* Detail view styles */
+        .volunteer-detail-view {
+            background-color: #f8fafc;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .volunteer-detail-view .detail-picture {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #3b82f6;
+            margin-bottom: 1.5rem;
+        }
+        .volunteer-detail-view h3 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 1rem;
+        }
+        .volunteer-detail-view .detail-group {
+            margin-bottom: 0.75rem;
+        }
+        .volunteer-detail-view .detail-label {
+            font-weight: 600;
+            color: #475569;
+        }
+        .volunteer-detail-view .detail-value {
+            color: #334155;
+        }
+    </style>
+</head>
+<body>
+    <div class="container max-w-screen-2xl">
+        <h1 class="text-4xl font-bold text-center mb-8 text-blue-800">Construction Volunteer Management System</h1>
+
+        <!-- Tab Navigation -->
+        <div class="flex justify-center flex-wrap gap-2 mb-8">
+            <button class="tab-button active" data-tab="volunteers">Volunteer Management</button>
+            <button class="tab-button" data-tab="attendance">Attendance Monitoring</button>
+            <button class="tab-button" data-tab="tasks">Task & Assignment</button>
+            <button class="tab-button" data-tab="requests">Request Management</button>
+            <button class="tab-button" data-tab="tradeReports">Trade Reports</button>
+        </div>
+
+        <!-- Volunteer Management Tab -->
+        <div id="volunteers" class="tab-content active">
+            <h2 class="text-3xl font-semibold mb-6 text-gray-700">Volunteer Information</h2>
+
+            <!-- Button to show the volunteer form -->
+            <div class="mb-6 text-center space-x-4">
+                <button id="addNewVolunteerBtn" class="btn-primary">Add New Volunteer</button>
+                <button id="importExcelBtn" class="btn-secondary">Import from Excel</button>
+                <input type="file" id="excelFileInput" class="hidden" accept=".xlsx, .xls, .csv">
+            </div>
+
+            <!-- Volunteer Form - Initially hidden -->
+            <div id="volunteerFormContainer" class="hidden">
+                <form id="volunteerForm" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 p-6 bg-blue-50 rounded-lg shadow-inner">
+                    <input type="hidden" id="volunteerId">
+                    <div class="form-group md:col-span-2">
+                        <label for="fullName">Full Name:</label>
+                        <input type="text" id="fullName" required class="mt-1" placeholder="e.g., Dela Cruz, Juan A.">
+                    </div>
+                    <div class="form-group">
+                        <label for="assignedNumber">Assigned Number:</label>
+                        <input type="text" id="assignedNumber" required class="mt-1">
+                    </div>
+                     <div class="form-group">
+                        <label for="contactNumber">Contact Number:</label>
+                        <input type="tel" id="contactNumber" class="mt-1">
+                    </div>
+                    <div class="form-group">
+                        <label for="trade">Trade:</label>
+                        <select id="trade" class="mt-1" required>
+                            <option value="">-- Select Trade --</option>
+                            <option value="Bodegero">Bodegero</option>
+                            <option value="Carpenter">Carpenter</option>
+                            <option value="Driver">Driver</option>
+                            <option value="Electrician">Electrician</option>
+                            <option value="Foreman">Foreman</option>
+                            <option value="Gardener">Gardener</option>
+                            <option value="Heavy Equipment Operator">Heavy Equipment Operator</option>
+                            <option value="HVAC Technician">HVAC Technician</option>
+                            <option value="Ironworker">Ironworker</option>
+                            <option value="Laborer">Laborer</option>
+                            <option value="Mason">Mason</option>
+                            <option value="Painter">Painter</option>
+                            <option value="Plumber">Plumber</option>
+                            <option value="Roofer">Roofer</option>
+                            <option value="Steelman">Steelman</option>
+                            <option value="Tinsmith">Tinsmith</option>
+                            <option value="Upholsterer">Upholsterer</option>
+                            <option value="Welder">Welder</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="maritalStatus">Marital Status:</label>
+                        <select id="maritalStatus" class="mt-1" required>
+                            <option value="">-- Select Status --</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                            <option value="Widower">Widower</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="homeAddress">Home Address:</label>
+                        <input type="text" id="homeAddress" class="mt-1">
+                    </div>
+                    <div class="form-group">
+                        <label for="birthDate">Birth Date:</label>
+                        <input type="date" id="birthDate" class="mt-1">
+                        <span id="volunteerAge" class="text-sm text-gray-600 ml-2"></span> <!-- Display for age -->
+                    </div>
+                    <div class="form-group">
+                        <label for="bloodType">Blood Type:</label>
+                        <select id="bloodType" class="mt-1">
+                            <option value="">-- Select Blood Type --</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="medicalCondition">Medical Condition(s):</label>
+                        <input type="text" id="medicalCondition" class="mt-1" placeholder="e.g., Asthma, Diabetes">
+                    </div>
+                    <div class="form-group">
+                        <label for="emergencyContactPerson">Emergency Contact Person:</label>
+                        <input type="text" id="emergencyContactPerson" class="mt-1">
+                    </div>
+                    <div class="form-group">
+                        <label for="emergencyContactNumber">Emergency Contact Number:</label>
+                        <input type="tel" id="emergencyContactNumber" class="mt-1">
+                    </div>
+                    <div class="form-group">
+                        <label for="spouseName">Spouse Name:</label>
+                        <input type="text" id="spouseName" class="mt-1">
+                    </div>
+                     <div class="form-group">
+                        <label for="spouseContactNumber">Spouse's Contact Number:</label>
+                        <input type="tel" id="spouseContactNumber" class="mt-1">
+                    </div>
+                    <div class="form-group">
+                        <label for="weddingAnniversary">Wedding Anniversary:</label>
+                        <input type="date" id="weddingAnniversary" class="mt-1">
+                    </div>
+                    <div class="form-group">
+                        <label for="churchCongregation">Church Local Congregation:</label>
+                        <input type="text" id="churchCongregation" class="mt-1">
+                    </div>
+
+                    <!-- Children's Information -->
+                    <div class="md:col-span-2" id="childrenSection" data-marital-status-dependent>
+                        <h4 class="text-lg font-semibold mb-2 text-gray-700">Children's Information</h4>
+                        <div id="childrenInfoContainer" class="space-y-3">
+                            <!-- Child input rows will be added here by JavaScript -->
+                        </div>
+                        <button type="button" id="addChildBtn" class="btn-secondary mt-3 px-4 py-2 text-sm">Add Child</button>
+                    </div>
+
+                    <!-- Volunteer Picture Upload -->
+                    <div class="md:col-span-2">
+                        <h4 class="text-lg font-semibold mb-2 text-gray-700">Volunteer Picture</h4>
+                        <div id="pictureDropArea" class="drop-area">
+                            Drag & Drop Picture Here or Paste (Ctrl+V)
+                            <input type="file" id="pictureUploadInput" accept="image/*" class="hidden">
+                            <img id="picturePreview" class="image-preview mx-auto" src="#" alt="Image Preview" style="display: none;">
+                        </div>
+                        <button type="button" id="clearPictureBtn" class="btn-secondary mt-3 px-4 py-2 text-sm">Clear Picture</button>
+                    </div>
+
+
+                    <div class="md:col-span-2 flex justify-end space-x-4">
+                        <button type="submit" class="btn-primary">Save Volunteer</button>
+                        <button type="button" id="clearVolunteerForm" class="btn-secondary">Clear Form</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Registered Volunteers - Card View -->
+            <div id="volunteerCardView">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-700">Registered Volunteers</h3>
+                <div class="mb-4 flex flex-wrap items-center gap-4">
+                    <div class="flex-grow flex items-center space-x-2">
+                         <label for="volunteerSearch" class="font-medium text-gray-700">Search:</label>
+                         <input type="text" id="volunteerSearch" placeholder="Name or assigned number..." class="flex-1 p-2 border rounded-md">
+                         <button id="clearSearchBtn" class="btn-secondary px-3 py-2 text-sm">Clear</button>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <label for="sortVolunteersBy" class="font-medium text-gray-700">Sort By:</label>
+                        <select id="sortVolunteersBy" class="p-2 border rounded-md">
+                            <option value="fullName">Full Name</option>
+                            <option value="age">Age</option>
+                            <option value="trade">Trade</option>
+                            <option value="churchCongregation">Church Congregation</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="volunteerCardList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    <!-- Volunteer cards will be loaded here -->
+                </div>
+                <p id="noVolunteersFound" class="text-center text-gray-600 mt-8 hidden">No volunteers found matching your search.</p>
+                <p id="noRegisteredVolunteers" class="text-center text-gray-600 mt-8 hidden">No volunteers registered yet.</p>
+            </div>
+
+            <!-- Volunteer Detail View - Initially hidden -->
+            <div id="volunteerDetailView" class="hidden volunteer-detail-view">
+                <button id="backToVolunteerListBtn" class="btn-secondary mb-6">← Back to Volunteer List</button>
+                <div class="flex flex-col items-center">
+                    <img id="detailPicture" class="detail-picture" src="#" alt="Volunteer Picture">
+                    <h3 id="detailFullName" class="text-center"></h3>
+                    <p id="detailAssignedNumber" class="text-lg text-gray-600 mb-4"></p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 text-left">
+                    <div class="detail-group"><span class="detail-label">Trade:</span> <span id="detailTrade" class="detail-value"></span></div>
+                    <div class="detail-group"><span class="detail-label">Age:</span> <span id="detailAge" class="detail-value"></span></div>
+                    <div class="detail-group"><span class="detail-label">Contact Number:</span> <span id="detailContactNumber" class="detail-value"></span></div>
+                    <div class="detail-group"><span class="detail-label">Blood Type:</span> <span id="detailBloodType" class="detail-value"></span></div>
+                    <div class="detail-group md:col-span-2"><span class="detail-label">Medical Condition(s):</span> <span id="detailMedicalCondition" class="detail-value"></span></div>
+                    <div class="detail-group"><span class="detail-label">Emergency Contact:</span> <span id="detailEmergencyContactPerson" class="detail-value"></span></div>
+                    <div class="detail-group"><span class="detail-label">Emergency Contact No.:</span> <span id="detailEmergencyContactNumber" class="detail-value"></span></div>
+                    <div class="detail-group md:col-span-2"><span class="detail-label">Home Address:</span> <span id="detailHomeAddress" class="detail-value"></span></div>
+                    <div class="detail-group"><span class="detail-label">Birth Date:</span> <span id="detailBirthDate" class="detail-value"></span></div>
+                    <div class="detail-group"><span class="detail-label">Marital Status:</span> <span id="detailMaritalStatus" class="detail-value"></span></div>
+                    <div class="detail-group"><span class="detail-label">Spouse Name:</span> <span id="detailSpouseName" class="detail-value"></span></div>
+                    <div class="detail-group"><span class="detail-label">Spouse's Contact:</span> <span id="detailSpouseContactNumber" class="detail-value"></span></div>
+                    <div class="detail-group"><span class="detail-label">Wedding Anniversary:</span> <span id="detailWeddingAnniversary" class="detail-value"></span></div>
+                    <div class="detail-group md:col-span-2"><span class="detail-label">Church Local Congregation:</span> <span id="detailChurchCongregation" class="detail-value"></span></div>
+                    <div class="detail-group md:col-span-2">
+                        <span class="detail-label">Children:</span>
+                        <ul id="detailChildren" class="detail-value list-disc list-inside pl-4"></ul>
+                    </div>
+                </div>
+                <div class="flex justify-center space-x-4 mt-8">
+                    <button id="editVolunteerBtn" class="btn-primary text-sm px-4 py-2">Edit Volunteer</button>
+                    <button id="deleteVolunteerBtn" class="btn-danger text-sm px-4 py-2">Delete Volunteer</button>
+                    <button id="viewHistoryBtn" class="btn-secondary text-sm px-4 py-2">View Project History</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Monitoring Tab -->
+        <div id="attendance" class="tab-content hidden">
+            <h2 class="text-3xl font-semibold mb-6 text-gray-700">Attendance Monitoring</h2>
+
+            <!-- New section for marking absent volunteers -->
+            <div class="mb-6 p-6 bg-red-50 rounded-lg shadow-inner">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-700">Record Absent Volunteers</h3>
+                <div id="absenteeInputContainer">
+                    <!-- Initial absentee input fields will be added here by JavaScript -->
+                </div>
+                <div class="flex justify-end space-x-4 mt-4">
+                    <button id="addAbsenteeFieldBtn" class="btn-secondary">Add Another Absentee</button>
+                    <button id="recordAbsencesBtn" class="btn-danger">Record Absences</button>
+                </div>
+            </div>
+
+            <h3 class="text-2xl font-semibold mb-4 text-gray-700">Attendance Records</h3>
+            <div class="overflow-x-auto">
+                <table class="table-auto">
+                    <thead>
+                        <tr>
+                            <th>Volunteer Name</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Reason (if Absent)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceRecords">
+                        <!-- Attendance records will be loaded here -->
+                    </tbody>
+                </table>
+                <p id="noAttendanceRecords" class="text-center text-gray-600 mt-4 hidden">No attendance records found.</p>
+            </div>
+        </div>
+
+        <!-- Task & Assignment Tab -->
+        <div id="tasks" class="tab-content hidden">
+            <h2 class="text-3xl font-semibold mb-6 text-gray-700">Task & Assignment Monitoring</h2>
+
+            <div class="mb-6 text-center">
+                <button id="importTasksBtn" class="btn-secondary">Import Tasks from Excel</button>
+                <input type="file" id="taskExcelFileInput" class="hidden" accept=".xlsx, .xls, .csv">
+            </div>
+
+            <form id="taskForm" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 p-6 bg-yellow-50 rounded-lg shadow-inner">
+                <input type="hidden" id="taskId">
+                <div class="form-group">
+                    <label for="taskVolunteerSelect">Assign To Volunteer:</label>
+                    <select id="taskVolunteerSelect" class="mt-1" required>
+                        <option value="">-- Select a Volunteer --</option>
+                        <!-- Volunteer options will be loaded here -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="taskProject">Project:</label>
+                    <input type="text" id="taskProject" class="mt-1" required>
+                </div>
+                <div class="form-group md:col-span-2">
+                    <label for="taskArea">Area:</label>
+                    <input type="text" id="taskArea" class="mt-1" required>
+                </div>
+                <div class="form-group md:col-span-2">
+                    <label for="taskDescription">Task Description:</label>
+                    <textarea id="taskDescription" rows="2" class="mt-1" required></textarea>
+                </div>
+                <div class="md:col-span-2 flex justify-end space-x-4">
+                    <button type="submit" class="btn-primary">Save Task</button>
+                    <button type="button" id="clearTaskForm" class="btn-secondary">Clear Form</button>
+                </div>
+            </form>
+
+            <h3 class="text-2xl font-semibold mb-4 text-gray-700">Assigned Tasks</h3>
+            <div class="overflow-x-auto">
+                <table class="table-auto">
+                    <thead>
+                        <tr>
+                            <th>Volunteer</th>
+                            <th>Project</th>
+                            <th>Area</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taskList">
+                        <!-- Task data will be loaded here -->
+                    </tbody>
+                </table>
+                <p id="noAssignedTasks" class="text-center text-gray-600 mt-4 hidden">No assigned tasks found.</p>
+            </div>
+
+            <!-- New section for Volunteers by Assigned Area -->
+            <div class="mt-8 p-6 bg-blue-50 rounded-lg shadow-inner">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-700">Volunteers by Assigned Area</h3>
+                <div id="volunteersByAreaContainer" class="space-y-4">
+                    <!-- Dynamic list of volunteers by area will be generated here -->
+                    <p class="text-center text-gray-600">Loading volunteers by area...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Request Management Tab -->
+        <div id="requests" class="tab-content hidden">
+            <h2 class="text-3xl font-semibold mb-6 text-gray-700">Volunteer Request Management</h2>
+
+            <div class="mb-6 p-6 bg-purple-50 rounded-lg shadow-inner">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-700">Submit New Request</h3>
+                <form id="requestForm" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="form-group">
+                        <label for="requestVolunteerIdentifier">Volunteer (Assigned No. or Name):</label>
+                        <input type="text" id="requestVolunteerIdentifier" class="mt-1" placeholder="Enter assigned number or name" list="volunteerDatalist" required>
+                        <datalist id="volunteerDatalist"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="requestType">Request Type:</label>
+                        <select id="requestType" class="mt-1" required>
+                            <option value="">-- Select Request Type --</option>
+                            <option value="Shift Change">Shift Change</option>
+                            <option value="Leave Request">Leave Request</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group md:col-span-2">
+                        <label for="requestDetails">Request Details:</label>
+                        <textarea id="requestDetails" rows="3" class="mt-1" placeholder="Describe the request in detail" required></textarea>
+                    </div>
+
+                    <!-- Dates of Absence Section (conditionally displayed) -->
+                    <div id="absenceDatesSection" class="md:col-span-2 hidden p-4 bg-purple-100 rounded-lg">
+                        <h4 class="text-lg font-semibold mb-2 text-gray-700">Dates of Absence</h4>
+                        <div id="absentDatesContainer" class="space-y-2">
+                            <!-- Dynamic date input fields will be added here -->
+                        </div>
+                        <button type="button" id="addAbsentDateBtn" class="btn-secondary mt-3 px-4 py-2 text-sm">Add Another Date</button>
+                    </div>
+
+                    <div class="md:col-span-2 flex justify-end space-x-4 mt-4">
+                        <button type="submit" class="btn-primary">Submit Request</button>
+                        <button type="button" id="clearRequestForm" class="btn-secondary">Clear Request Form</button>
+                    </div>
+                </form>
+
+                <div class="mt-8 p-4 bg-purple-100 rounded-lg">
+                    <h4 class="text-lg font-semibold mb-2 text-gray-700">Volunteer Request Summary</h4>
+                    <div class="form-group flex items-center space-x-2">
+                        <label for="summaryVolunteerIdentifier" class="text-sm">Volunteer (Assigned No. or Name):</label>
+                        <input type="text" id="summaryVolunteerIdentifier" class="flex-1 p-2 border rounded-md" placeholder="Enter assigned number or name" list="summaryVolunteerDatalist">
+                        <datalist id="summaryVolunteerDatalist"></datalist>
+                        <button id="showTotalRequestsBtn" class="btn-secondary px-3 py-2 text-sm">Show Total Requests</button>
+                    </div>
+                    <p id="totalRequestsDisplay" class="mt-2 text-lg font-medium text-gray-800">Total Requests for Volunteer: N/A</p>
+                </div>
+            </div>
+
+            <h3 class="text-2xl font-semibold mb-4 text-gray-700">All Volunteer Requests</h3>
+            <div class="overflow-x-auto">
+                <table class="table-auto">
+                    <thead>
+                        <tr>
+                            <th>Volunteer Name</th>
+                            <th>Request Date</th>
+                            <th>Type</th>
+                            <th>Details</th>
+                            <th>Absent Dates</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="requestList">
+                        <!-- Request data will be loaded here -->
+                    </tbody>
+                </table>
+                <p id="noRequestsFound" class="text-center text-gray-600 mt-4 hidden">No requests found.</p>
+            </div>
+        </div>
+
+        <!-- Trade Reports Tab -->
+        <div id="tradeReports" class="tab-content hidden">
+            <h2 class="text-3xl font-semibold mb-6 text-gray-700">Volunteer Trade Reports</h2>
+
+            <div class="mb-6 p-6 bg-green-50 rounded-lg shadow-inner">
+                <h3 class="text-2xl font-semibold mb-4 text-gray-700">Volunteer Summary by Trade</h3>
+                <div id="tradeSummary" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Summary will be dynamically inserted here -->
+                </div>
+                <p id="noTradeSummary" class="text-center text-gray-600 mt-4 hidden">No volunteers registered yet to generate trade summary.</p>
+            </div>
+
+            <h3 class="text-2xl font-semibold mb-4 text-gray-700">Volunteers by Selected Trade</h3>
+            <div class="mb-4 flex items-center space-x-2">
+                <label for="tradeFilterSelect" class="font-medium text-gray-700">Select Trade:</label>
+                <select id="tradeFilterSelect" class="flex-1 p-2 border rounded-md">
+                    <option value="">-- All Trades --</option>
+                    <!-- Trades will be populated here -->
+                </select>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="table-auto">
+                    <thead>
+                        <tr>
+                            <th>Assigned No.</th>
+                            <th>Full Name</th>
+                            <th>Trade</th>
+                            <th>Age</th>
+                            <th>Address</th>
+                        </tr>
+                    </thead>
+                    <tbody id="volunteersByTradeList">
+                        <!-- Volunteers for selected trade will be loaded here -->
+                    </tbody>
+                </table>
+                <p id="noVolunteersByTrade" class="text-center text-gray-600 mt-4 hidden">No volunteers found for this trade.</p>
+            </div>
+        </div>
+        
+        <div class="mt-12 text-center border-t pt-6 space-x-4">
+             <button id="exportDataBtn" class="btn-secondary">Export All Data</button>
+             <button id="importDataBtn" class="btn-secondary">Import All Data</button>
+             <input type="file" id="importDataInput" class="hidden" accept=".json">
+             <button id="deleteAllDataBtn" class="btn-danger">Delete All Data</button>
+        </div>
+    </div>
+
+    <!-- Message Box for Confirmations/Alerts -->
+    <div id="messageBoxOverlay" class="message-box-overlay hidden"></div>
+    <div id="messageBox" class="message-box hidden">
+        <h3 id="messageBoxTitle"></h3>
+        <p id="messageBoxContent"></p>
+        <div id="messageBoxButtons" class="flex justify-center">
+            <button id="messageBoxConfirmBtn" class="btn-primary">OK</button>
+            <button id="messageBoxCancelBtn" class="btn-secondary hidden">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Project History Modal -->
+    <div id="projectHistoryModalOverlay" class="modal-overlay hidden"></div>
+    <div id="projectHistoryModal" class="modal hidden">
+        <h3 id="projectHistoryModalTitle"></h3>
+        <div class="modal-content">
+            <table class="table-auto">
+                <thead>
+                    <tr>
+                        <th>Project</th>
+                        <th>Area</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody id="projectHistoryList">
+                    <!-- Project history data will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+        <div class="flex justify-center mt-6">
+            <button id="closeProjectHistoryModalBtn" class="btn-secondary">Close</button>
+        </div>
+    </div>
+
+    <!-- Excel Import Mapping Modal -->
+    <div id="importMappingModalOverlay" class="modal-overlay hidden"></div>
+    <div id="importMappingModal" class="modal hidden" style="max-width: 800px;">
+        <h3>Map Excel Columns to Volunteer Fields</h3>
+        <p>Please select the corresponding column from your Excel file for each required field. You can skip fields that are not in your file.</p>
+        <div id="importMappingContainer" class="modal-content grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Mapping fields will be generated here by JavaScript -->
+        </div>
+        <div class="flex justify-center mt-6 space-x-4">
+            <button id="processImportBtn" class="btn-primary">Process Import</button>
+            <button id="cancelImportBtn" class="btn-secondary">Cancel</button>
+        </div>
+    </div>
+    
+    <!-- Task Import Mapping Modal -->
+    <div id="taskImportMappingModalOverlay" class="modal-overlay hidden"></div>
+    <div id="taskImportMappingModal" class="modal hidden" style="max-width: 800px;">
+        <h3>Map Excel Columns to Task Fields</h3>
+        <p>Please select the corresponding column from your Excel file for each required field.</p>
+        <div id="taskImportMappingContainer" class="modal-content grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Mapping fields will be generated here by JavaScript -->
+        </div>
+        <div class="flex justify-center mt-6 space-x-4">
+            <button id="processTaskImportBtn" class="btn-primary">Process Task Import</button>
+            <button id="cancelTaskImportBtn" class="btn-secondary">Cancel</button>
+        </div>
+    </div>
+    
+    <!-- Duplicate Handling Modal -->
+    <div id="duplicateModalOverlay" class="modal-overlay hidden"></div>
+    <div id="duplicateModal" class="modal hidden" style="max-width: 900px;">
+        <h3>Handle Duplicate Entries</h3>
+        <p>The following volunteers (based on Assigned Number) already exist. Choose whether to update them with the new data or ignore the imported row.</p>
+        <div id="duplicateListContainer" class="modal-content">
+            <!-- Duplicate entries will be listed here -->
+        </div>
+        <div class="flex justify-center mt-6 space-x-4">
+            <button id="confirmDuplicateChoicesBtn" class="btn-primary">Confirm Choices & Import</button>
+            <button id="cancelDuplicateBtn" class="btn-secondary">Cancel Import</button>
+        </div>
+    </div>
+    
+    <!-- Final Delete Confirmation Modal -->
+    <div id="finalDeleteModalOverlay" class="modal-overlay hidden"></div>
+    <div id="finalDeleteModal" class="modal hidden">
+        <h3>Final Confirmation</h3>
+        <p>This action is irreversible. To confirm, please type "DELETE" in the box below.</p>
+        <div class="form-group">
+            <input type="text" id="deleteConfirmationInput" class="mt-1 text-center">
+        </div>
+        <div class="flex justify-center mt-6 space-x-4">
+            <button id="finalDeleteBtn" class="btn-danger" disabled>Delete All Data</button>
+            <button id="cancelFinalDeleteBtn" class="btn-secondary">Cancel</button>
+        </div>
+    </div>
+
+
+    <script>
+        // Wrap the entire script in an IIFE to prevent global variable conflicts
+        (function() {
+            // --- IndexedDB Setup ---
+            const DB_NAME = 'ConstructionDB';
+            const DB_VERSION = 11; // Incremented version for schema change
+            let db;
+
+            // Global variables
+            let allVolunteers = [];
+            let currentDetailVolunteerId = null; 
+            let excelDataToImport = null; // To hold parsed Excel data
+            let newVolunteersToImport = [];
+            let duplicateVolunteersToProcess = [];
+            let taskDataToImport = null;
+
+            /**
+             * Opens and sets up the IndexedDB database.
+             */
+            function openDB() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                    request.onupgradeneeded = function(event) {
+                        db = event.target.result;
+                        const transaction = event.target.transaction;
+                        console.log(`Upgrading database from version ${event.oldVersion} to ${event.newVersion}`);
+
+                        // Re-create stores to ensure clean schema
+                        if (db.objectStoreNames.contains('volunteers')) db.deleteObjectStore('volunteers');
+                        if (db.objectStoreNames.contains('attendance')) db.deleteObjectStore('attendance');
+                        if (db.objectStoreNames.contains('tasks')) db.deleteObjectStore('tasks');
+                        if (db.objectStoreNames.contains('requests')) db.deleteObjectStore('requests');
+
+                        // Create object stores (tables)
+                        const volunteerStore = db.createObjectStore('volunteers', { keyPath: 'id', autoIncrement: true });
+                        volunteerStore.createIndex('assignedNumber', 'assignedNumber', { unique: true });
+                        volunteerStore.createIndex('fullName', 'fullName', { unique: false });
+                        volunteerStore.createIndex('trade', 'trade', { unique: false });
+
+                        const attendanceStore = db.createObjectStore('attendance', { keyPath: 'id', autoIncrement: true });
+                        attendanceStore.createIndex('volunteerId', 'volunteerId', { unique: false });
+                        attendanceStore.createIndex('date', 'date', { unique: false });
+                        attendanceStore.createIndex('volunteerIdAndDate', ['volunteerId', 'date'], { unique: true });
+
+                        const taskStore = db.createObjectStore('tasks', { keyPath: 'id', autoIncrement: true });
+                        taskStore.createIndex('assignedToVolunteerId', 'assignedToVolunteerId', { unique: false });
+
+                        const requestStore = db.createObjectStore('requests', { keyPath: 'id', autoIncrement: true });
+                        requestStore.createIndex('volunteerId', 'volunteerId', { unique: false });
+                        
+                        transaction.oncomplete = () => console.log('Database upgrade complete.');
+                    };
+
+                    request.onsuccess = function(event) {
+                        db = event.target.result;
+                        console.log('Database opened successfully.');
+                        resolve();
+                    };
+
+                    request.onerror = function(event) {
+                        console.error('Database error:', event.target.error);
+                        reject(event.target.error);
+                    };
+                });
+            }
+
+            // --- Generic DB Helper Functions ---
+            function addData(storeName, data) {
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.add(data);
+                    request.onsuccess = e => resolve(e.target.result);
+                    request.onerror = e => {
+                        console.error(`Error adding to ${storeName}:`, e.target.error);
+                        reject(e.target.error);
+                    };
+                });
+            }
+
+            function updateData(storeName, data) {
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.put(data);
+                    request.onsuccess = () => resolve();
+                    request.onerror = e => {
+                        console.error(`Error updating in ${storeName}:`, e.target.error);
+                        reject(e.target.error);
+                    };
+                });
+            }
+
+            function getAllData(storeName) {
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction([storeName], 'readonly');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.getAll();
+                    request.onsuccess = e => resolve(e.target.result);
+                    request.onerror = e => {
+                        console.error(`Error getting all from ${storeName}:`, e.target.error);
+                        reject(e.target.error);
+                    };
+                });
+            }
+
+            function getDataById(storeName, id) {
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction([storeName], 'readonly');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.get(id);
+                    request.onsuccess = e => resolve(e.target.result);
+                    request.onerror = e => {
+                        console.error(`Error getting by ID from ${storeName}:`, e.target.error);
+                        reject(e.target.error);
+                    };
+                });
+            }
+
+            function deleteData(storeName, id) {
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction([storeName], 'readwrite');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.delete(id);
+                    request.onsuccess = () => resolve();
+                    request.onerror = e => {
+                        console.error(`Error deleting from ${storeName}:`, e.target.error);
+                        reject(e.target.error);
+                    };
+                });
+            }
+
+            function getDataByIndex(storeName, indexName, key) {
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction([storeName], 'readonly');
+                    const store = transaction.objectStore(storeName);
+                    const index = store.index(indexName);
+                    const request = index.getAll(key);
+                    request.onsuccess = e => resolve(e.target.result);
+                    request.onerror = e => {
+                        console.error(`Error getting by index from ${storeName}:`, e.target.error);
+                        reject(e.target.error);
+                    };
+                });
+            }
+
+            // --- Utility Functions ---
+            function calculateAge(birthDateString) {
+                if (!birthDateString) return 'N/A';
+                const birthDate = new Date(birthDateString);
+                if (isNaN(birthDate.getTime())) return 'N/A';
+                const today = new Date();
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+                return age;
+            }
+
+            // --- UI Functions ---
+            function showMessageBox(title, message, isConfirm = false, onConfirmCallback = null, onCancelCallback = null) {
+                const messageBoxOverlay = document.getElementById('messageBoxOverlay');
+                const messageBox = document.getElementById('messageBox');
+                const messageBoxTitle = document.getElementById('messageBoxTitle');
+                const messageBoxContent = document.getElementById('messageBoxContent');
+                const messageBoxConfirmBtn = document.getElementById('messageBoxConfirmBtn');
+                const messageBoxCancelBtn = document.getElementById('messageBoxCancelBtn');
+
+                messageBoxTitle.textContent = title;
+                messageBoxContent.textContent = message;
+                messageBoxConfirmBtn.textContent = isConfirm ? 'Confirm' : 'OK';
+                messageBoxCancelBtn.classList.toggle('hidden', !isConfirm);
+                messageBoxOverlay.classList.remove('hidden');
+                messageBox.classList.remove('hidden');
+
+                messageBoxConfirmBtn.onclick = () => {
+                    messageBoxOverlay.classList.add('hidden');
+                    messageBox.classList.add('hidden');
+                    if (onConfirmCallback) onConfirmCallback();
+                };
+
+                if (isConfirm) {
+                    messageBoxCancelBtn.onclick = () => {
+                        messageBoxOverlay.classList.add('hidden');
+                        messageBox.classList.add('hidden');
+                        if (onCancelCallback) onCancelCallback();
+                    };
+                }
+            }
+
+            // --- Volunteer Management Functions ---
+            async function loadVolunteers() {
+                const volunteerCardList = document.getElementById('volunteerCardList');
+                const noRegisteredVolunteersMessage = document.getElementById('noRegisteredVolunteers');
+                volunteerCardList.innerHTML = '';
+                noRegisteredVolunteersMessage.classList.add('hidden');
+
+                try {
+                    allVolunteers = await getAllData('volunteers');
+                    if (allVolunteers.length === 0) {
+                        noRegisteredVolunteersMessage.classList.remove('hidden');
+                    }
+                    filterVolunteers(document.getElementById('volunteerSearch').value);
+                } catch (error) {
+                    console.error('Error loading volunteers:', error);
+                    showMessageBox('Error', 'Failed to load volunteer data.');
+                }
+            }
+
+            function filterVolunteers(searchTerm) {
+                const volunteerCardList = document.getElementById('volunteerCardList');
+                const noVolunteersFoundMessage = document.getElementById('noVolunteersFound');
+                const noRegisteredVolunteersMessage = document.getElementById('noRegisteredVolunteers');
+                const sortBy = document.getElementById('sortVolunteersBy').value;
+                
+                volunteerCardList.innerHTML = '';
+                noVolunteersFoundMessage.classList.add('hidden');
+                noRegisteredVolunteersMessage.classList.add('hidden');
+
+                const lowerCaseSearchTerm = searchTerm.toLowerCase().trim();
+                let filteredVolunteers = allVolunteers.filter(v => {
+                    if (!lowerCaseSearchTerm) return true;
+                    return (v.fullName && v.fullName.toLowerCase().includes(lowerCaseSearchTerm)) || 
+                           (v.assignedNumber && v.assignedNumber.toLowerCase().includes(lowerCaseSearchTerm));
+                });
+
+                // Sorting logic
+                filteredVolunteers.sort((a, b) => {
+                    if (sortBy === 'age') {
+                        const ageA = calculateAge(a.birthDate);
+                        const ageB = calculateAge(b.birthDate);
+                        if (ageA === 'N/A') return 1;
+                        if (ageB === 'N/A') return -1;
+                        return ageA - ageB;
+                    }
+                    // For text-based sorting
+                    const valA = a[sortBy] || '';
+                    const valB = b[sortBy] || '';
+                    return valA.localeCompare(valB);
+                });
+
+                if (filteredVolunteers.length === 0) {
+                    if (lowerCaseSearchTerm) {
+                        noVolunteersFoundMessage.classList.remove('hidden');
+                    } else if (allVolunteers.length === 0) {
+                        noRegisteredVolunteersMessage.classList.remove('hidden');
+                    }
+                    return;
+                }
+
+                filteredVolunteers.forEach(volunteer => {
+                    const age = calculateAge(volunteer.birthDate);
+                    const pictureSrc = volunteer.picture || 'https://placehold.co/60x60/cbd5e1/64748b?text=No+Pic';
+                    const card = document.createElement('div');
+                    card.className = 'volunteer-card';
+                    card.dataset.volunteerId = volunteer.id;
+                    card.innerHTML = `
+                        <button class="volunteer-card-delete-btn" data-id="${volunteer.id}">&times;</button>
+                        <div class="volunteer-card-header">
+                            <img src="${pictureSrc}" alt="${volunteer.fullName}" class="volunteer-card-picture" onerror="this.onerror=null;this.src='https://placehold.co/60x60/cbd5e1/64748b?text=No+Pic';">
+                            <div>
+                                <div class="volunteer-card-name"><strong>${volunteer.assignedNumber || 'N/A'}</strong> ${volunteer.fullName}</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="volunteer-card-info"><strong>Age:</strong> ${age !== 'N/A' ? age : 'N/A'}, <strong>Trade:</strong> ${volunteer.trade || 'N/A'}</div>
+                            <div class="volunteer-card-info"><strong>Contact:</strong> ${volunteer.contactNumber || 'N/A'}</div>
+                            <div class="volunteer-card-info"><strong>Spouse:</strong> ${volunteer.spouseName || 'N/A'}</div>
+                            <div class="volunteer-card-info"><strong>Spouse Contact:</strong> ${volunteer.spouseContactNumber || 'N/A'}</div>
+                            <div class="volunteer-card-info"><strong>Emergency:</strong> ${volunteer.emergencyContactPerson || 'N/A'}</div>
+                            <div class="volunteer-card-info"><strong>Emergency No:</strong> ${volunteer.emergencyContactNumber || 'N/A'}</div>
+                            <div class="volunteer-card-info"><strong>Medical:</strong> ${volunteer.medicalCondition || 'N/A'}</div>
+                        </div>
+                    `;
+                    volunteerCardList.appendChild(card);
+                });
+            }
+            
+            async function showVolunteerDetail(id) {
+                try {
+                    const volunteer = await getDataById('volunteers', id);
+                    if (!volunteer) {
+                        showMessageBox('Error', 'Volunteer details not found.');
+                        return;
+                    }
+
+                    currentDetailVolunteerId = id;
+                    document.getElementById('volunteerCardView').classList.add('hidden');
+                    document.getElementById('volunteerFormContainer').classList.add('hidden');
+                    document.getElementById('volunteerDetailView').classList.remove('hidden');
+
+                    document.getElementById('detailPicture').src = volunteer.picture || 'https://placehold.co/150x150/cbd5e1/64748b?text=No+Pic';
+                    document.getElementById('detailFullName').textContent = volunteer.fullName;
+                    document.getElementById('detailAssignedNumber').textContent = `Assigned No: ${volunteer.assignedNumber || 'N/A'}`;
+                    document.getElementById('detailTrade').textContent = volunteer.trade || 'N/A';
+                    document.getElementById('detailAge').textContent = calculateAge(volunteer.birthDate);
+                    document.getElementById('detailContactNumber').textContent = volunteer.contactNumber || 'N/A';
+                    document.getElementById('detailBloodType').textContent = volunteer.bloodType || 'N/A';
+                    document.getElementById('detailMedicalCondition').textContent = volunteer.medicalCondition || 'N/A';
+                    document.getElementById('detailEmergencyContactPerson').textContent = volunteer.emergencyContactPerson || 'N/A';
+                    document.getElementById('detailEmergencyContactNumber').textContent = volunteer.emergencyContactNumber || 'N/A';
+                    document.getElementById('detailHomeAddress').textContent = volunteer.homeAddress || 'N/A';
+                    document.getElementById('detailBirthDate').textContent = volunteer.birthDate || 'N/A';
+                    document.getElementById('detailMaritalStatus').textContent = volunteer.maritalStatus || 'N/A';
+                    document.getElementById('detailSpouseName').textContent = volunteer.spouseName || 'N/A';
+                    document.getElementById('detailSpouseContactNumber').textContent = volunteer.spouseContactNumber || 'N/A';
+                    document.getElementById('detailWeddingAnniversary').textContent = volunteer.weddingAnniversary || 'N/A';
+                    document.getElementById('detailChurchCongregation').textContent = volunteer.churchCongregation || 'N/A';
+
+                    const detailChildrenList = document.getElementById('detailChildren');
+                    detailChildrenList.innerHTML = '';
+                    if (volunteer.children && volunteer.children.length > 0) {
+                        volunteer.children.forEach(child => {
+                            const li = document.createElement('li');
+                            const childAge = calculateAge(child.birthDate);
+                            li.textContent = `${child.name}${childAge !== 'N/A' ? ` (${childAge})` : ''}`;
+                            detailChildrenList.appendChild(li);
+                        });
+                    } else {
+                        detailChildrenList.innerHTML = '<li>N/A</li>';
+                    }
+                } catch (error) {
+                    showMessageBox('Error', `Failed to load volunteer details: ${error.message}`);
+                    console.error('Show detail error:', error);
+                }
+            }
+
+            function hideVolunteerDetail() {
+                document.getElementById('volunteerDetailView').classList.add('hidden');
+                document.getElementById('volunteerCardView').classList.remove('hidden');
+                currentDetailVolunteerId = null;
+                loadVolunteers();
+            }
+
+            window.editVolunteer = async function(id) {
+                try {
+                    const volunteer = await getDataById('volunteers', id);
+                    if (!volunteer) {
+                        showMessageBox('Error', 'Volunteer not found for editing.');
+                        return;
+                    }
+                    
+                    document.getElementById('volunteerCardView').classList.add('hidden');
+                    document.getElementById('volunteerDetailView').classList.add('hidden');
+                    document.getElementById('volunteerFormContainer').classList.remove('hidden');
+
+                    document.getElementById('volunteerId').value = volunteer.id;
+                    document.getElementById('fullName').value = volunteer.fullName || '';
+                    document.getElementById('assignedNumber').value = volunteer.assignedNumber || '';
+                    document.getElementById('contactNumber').value = volunteer.contactNumber || '';
+                    document.getElementById('trade').value = volunteer.trade || '';
+                    document.getElementById('maritalStatus').value = volunteer.maritalStatus || '';
+                    document.getElementById('homeAddress').value = volunteer.homeAddress || '';
+                    document.getElementById('birthDate').value = volunteer.birthDate || '';
+                    document.getElementById('bloodType').value = volunteer.bloodType || '';
+                    document.getElementById('medicalCondition').value = volunteer.medicalCondition || '';
+                    document.getElementById('emergencyContactPerson').value = volunteer.emergencyContactPerson || '';
+                    document.getElementById('emergencyContactNumber').value = volunteer.emergencyContactNumber || '';
+                    document.getElementById('spouseName').value = volunteer.spouseName || '';
+                    document.getElementById('spouseContactNumber').value = volunteer.spouseContactNumber || '';
+                    document.getElementById('weddingAnniversary').value = volunteer.weddingAnniversary || '';
+                    document.getElementById('churchCongregation').value = volunteer.churchCongregation || '';
+
+                    const childrenInfoContainer = document.getElementById('childrenInfoContainer');
+                    childrenInfoContainer.innerHTML = '';
+                    if (volunteer.children && volunteer.children.length > 0) {
+                        volunteer.children.forEach(child => addChildInputRow(child));
+                    }
+                    toggleChildrenFields();
+
+                    const picturePreview = document.getElementById('picturePreview');
+                    if (volunteer.picture) {
+                        picturePreview.src = volunteer.picture;
+                        picturePreview.style.display = 'block';
+                    } else {
+                        picturePreview.src = '#';
+                        picturePreview.style.display = 'none';
+                    }
+
+                    const age = calculateAge(volunteer.birthDate);
+                    document.getElementById('volunteerAge').textContent = age !== 'N/A' ? `(${age} years old)` : '';
+                    
+                    window.scrollTo(0, 0);
+
+                } catch (error) {
+                    showMessageBox('Error', `Failed to load volunteer for editing: ${error.message}`);
+                    console.error('Edit volunteer error:', error);
+                }
+            }
+
+            window.confirmDeleteVolunteer = function(id) {
+                showMessageBox(
+                    'Confirm Deletion',
+                    'Are you sure you want to delete this volunteer? This will also delete all associated attendance, task, and request records.',
+                    true,
+                    async () => {
+                        try {
+                            // Delete associated records first
+                            const tasks = await getDataByIndex('tasks', 'assignedToVolunteerId', id);
+                            for (const task of tasks) await deleteData('tasks', task.id);
+
+                            const attendance = await getDataByIndex('attendance', 'volunteerId', id);
+                            for (const record of attendance) await deleteData('attendance', record.id);
+
+                            const requests = await getDataByIndex('requests', 'volunteerId', id);
+                            for (const request of requests) await deleteData('requests', request.id);
+                            
+                            // Finally, delete the volunteer
+                            await deleteData('volunteers', id);
+
+                            showMessageBox('Success', 'Volunteer and associated records deleted successfully!');
+                            if (currentDetailVolunteerId === id) {
+                                hideVolunteerDetail();
+                            } else {
+                                loadVolunteers();
+                            }
+                            // Refresh other tabs' data
+                            loadAllData();
+                        } catch (error) {
+                            showMessageBox('Error', `Failed to delete volunteer: ${error.message}`);
+                            console.error('Delete volunteer error:', error);
+                        }
+                    }
+                );
+            }
+
+            function clearVolunteerForm(hideForm = true) {
+                document.getElementById('volunteerForm').reset();
+                document.getElementById('volunteerId').value = '';
+                document.getElementById('childrenInfoContainer').innerHTML = '';
+                document.getElementById('picturePreview').style.display = 'none';
+                document.getElementById('picturePreview').src = '#';
+                document.getElementById('pictureUploadInput').value = '';
+                document.getElementById('volunteerAge').textContent = '';
+                toggleChildrenFields();
+                if (hideForm) {
+                    document.getElementById('volunteerFormContainer').classList.add('hidden');
+                }
+            }
+
+            function toggleChildrenFields() {
+                const maritalStatusSelect = document.getElementById('maritalStatus');
+                const childrenSection = document.getElementById('childrenSection');
+                const status = maritalStatusSelect.value;
+                const isSingle = status === 'Single';
+                
+                childrenSection.classList.toggle('hidden', isSingle);
+                childrenSection.querySelectorAll('input, button').forEach(el => el.disabled = isSingle);
+
+                if (isSingle) {
+                    document.getElementById('childrenInfoContainer').innerHTML = '';
+                } else if (document.getElementById('childrenInfoContainer').children.length === 0) {
+                    addChildInputRow();
+                }
+            }
+
+            function addChildInputRow(child = { name: '', birthDate: '' }) {
+                const childrenInfoContainer = document.getElementById('childrenInfoContainer');
+                const newRow = document.createElement('div');
+                newRow.className = 'grid grid-cols-1 md:grid-cols-2 gap-2 mb-2 p-2 bg-gray-50 rounded-md relative child-entry';
+                newRow.innerHTML = `
+                    <div class="form-group">
+                        <label class="text-xs">Child's Name:</label>
+                        <input type="text" class="child-name mt-1" value="${child.name}" placeholder="Child's Full Name">
+                    </div>
+                    <div class="form-group">
+                        <label class="text-xs">Birth Date:</label>
+                        <input type="date" class="child-birth-date mt-1" value="${child.birthDate}">
+                        <span class="child-age text-xs text-gray-500 ml-2"></span>
+                    </div>
+                    <button type="button" class="remove-child-row absolute top-1 right-1 text-red-500 hover:text-red-700 font-bold text-lg">&times;</button>
+                `;
+                childrenInfoContainer.appendChild(newRow);
+            }
+
+            function handleFiles(files) {
+                if (!files || files.length === 0) return;
+                const file = files[0];
+                if (!file.type.startsWith('image/')) {
+                    showMessageBox('Error', 'Please drop or paste an image file.');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const picturePreview = document.getElementById('picturePreview');
+                    picturePreview.src = e.target.result;
+                    picturePreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+
+            // --- Attendance Functions ---
+            async function loadAttendanceRecords() {
+                const attendanceRecordsBody = document.getElementById('attendanceRecords');
+                const noAttendanceRecordsMessage = document.getElementById('noAttendanceRecords');
+                attendanceRecordsBody.innerHTML = '';
+                noAttendanceRecordsMessage.classList.add('hidden');
+
+                try {
+                    const records = await getAllData('attendance');
+                    if (records.length === 0) {
+                        noAttendanceRecordsMessage.classList.remove('hidden');
+                        return;
+                    }
+                    records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                    records.forEach(record => {
+                        const row = attendanceRecordsBody.insertRow();
+                        row.innerHTML = `
+                            <td>${record.volunteerName}</td>
+                            <td>${record.date}</td>
+                            <td>
+                                <span class="px-2 py-1 rounded-full text-xs font-semibold ${record.status === 'Absent' ? 'bg-red-200 text-red-800' : 'bg-gray-200 text-gray-800'}">
+                                    ${record.status}
+                                </span>
+                            </td>
+                            <td>${record.reason || 'N/A'}</td>
+                        `;
+                    });
+                } catch (error) {
+                    console.error('Error loading attendance:', error);
+                    showMessageBox('Error', 'Failed to load attendance data.');
+                }
+            }
+
+            function addAbsenteeInputRow() {
+                const absenteeInputContainer = document.getElementById('absenteeInputContainer');
+                const newRow = document.createElement('div');
+                newRow.className = 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 bg-red-100 rounded-lg relative absentee-entry';
+                newRow.innerHTML = `
+                    <div class="form-group">
+                        <label class="text-sm">Assigned Number:</label>
+                        <input type="text" class="absent-assigned-number mt-1" placeholder="Enter assigned number" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="text-sm">Reason for Absence:</label>
+                        <textarea rows="1" class="absence-reason mt-1" placeholder="e.g., Sick leave, Vacation" required></textarea>
+                    </div>
+                    <button type="button" class="remove-absentee-row absolute top-2 right-2 text-red-600 hover:text-red-800 font-bold text-lg">&times;</button>
+                `;
+                absenteeInputContainer.appendChild(newRow);
+            }
+            
+            // --- Task Functions ---
+            async function loadTasks() {
+                const taskListBody = document.getElementById('taskList');
+                const noAssignedTasksMessage = document.getElementById('noAssignedTasks');
+                taskListBody.innerHTML = '';
+                noAssignedTasksMessage.classList.add('hidden');
+
+                try {
+                    const tasks = await getAllData('tasks');
+                    if (tasks.length === 0) {
+                        noAssignedTasksMessage.classList.remove('hidden');
+                        return;
+                    }
+                    tasks.forEach(task => {
+                        const row = taskListBody.insertRow();
+                        row.innerHTML = `
+                            <td>${task.assignedToVolunteerName}</td>
+                            <td>${task.project}</td>
+                            <td>${task.area}</td>
+                            <td>${task.description}</td>
+                            <td class="flex space-x-2">
+                                <button class="btn-primary text-sm px-3 py-1 task-edit-btn" data-id="${task.id}">Edit</button>
+                                <button class="btn-danger text-sm px-3 py-1 task-delete-btn" data-id="${task.id}">Delete</button>
+                            </td>
+                        `;
+                    });
+                } catch (error) {
+                    console.error('Error loading tasks:', error);
+                    showMessageBox('Error', 'Failed to load task data.');
+                }
+            }
+
+            window.editTask = async function(id) {
+                try {
+                    const task = await getDataById('tasks', id);
+                    if (!task) {
+                        showMessageBox('Error', 'Task not found for editing.');
+                        return;
+                    }
+                    document.getElementById('taskId').value = task.id;
+                    document.getElementById('taskVolunteerSelect').value = task.assignedToVolunteerId;
+                    document.getElementById('taskProject').value = task.project;
+                    document.getElementById('taskArea').value = task.area;
+                    document.getElementById('taskDescription').value = task.description;
+                    document.getElementById('taskForm').scrollIntoView({ behavior: 'smooth' });
+                } catch (error) {
+                    showMessageBox('Error', `Failed to load task for editing: ${error.message}`);
+                }
+            }
+
+            window.confirmDeleteTask = function(id) {
+                showMessageBox('Confirm Deletion', 'Are you sure you want to delete this task?', true, async () => {
+                    try {
+                        await deleteData('tasks', id);
+                        showMessageBox('Success', 'Task deleted successfully!');
+                        loadTasks();
+                        loadVolunteersByArea();
+                    } catch (error) {
+                        showMessageBox('Error', `Failed to delete task: ${error.message}`);
+                    }
+                });
+            }
+
+            async function loadVolunteersByArea() {
+                const container = document.getElementById('volunteersByAreaContainer');
+                container.innerHTML = '<p class="text-center text-gray-600">Loading...</p>';
+
+                try {
+                    const allTasks = await getAllData('tasks');
+                    const volunteersByArea = {};
+
+                    allTasks.forEach(task => {
+                        const area = task.area || 'Unassigned Area';
+                        if (!volunteersByArea[area]) {
+                            volunteersByArea[area] = new Set();
+                        }
+                        volunteersByArea[area].add(task.assignedToVolunteerName);
+                    });
+
+                    if (Object.keys(volunteersByArea).length === 0) {
+                        container.innerHTML = '<p class="text-center text-gray-600">No tasks assigned with areas yet.</p>';
+                        return;
+                    }
+
+                    container.innerHTML = '';
+                    Object.keys(volunteersByArea).sort().forEach(area => {
+                        const areaDiv = document.createElement('div');
+                        areaDiv.className = 'p-4 bg-blue-100 rounded-lg shadow-sm';
+                        areaDiv.innerHTML = `
+                            <h4 class="text-lg font-semibold text-blue-800 mb-2">Area: ${area}</h4>
+                            <ul class="list-disc list-inside pl-4">
+                                ${Array.from(volunteersByArea[area]).sort().map(name => `<li>${name}</li>`).join('')}
+                            </ul>
+                        `;
+                        container.appendChild(areaDiv);
+                    });
+                } catch (error) {
+                    console.error('Error loading volunteers by area:', error);
+                    container.innerHTML = '<p class="text-center text-red-600">Failed to load data.</p>';
+                }
+            }
+
+            // --- Request Functions ---
+            async function loadRequests() {
+                const requestListBody = document.getElementById('requestList');
+                const noRequestsFoundMessage = document.getElementById('noRequestsFound');
+                requestListBody.innerHTML = '';
+                noRequestsFoundMessage.classList.add('hidden');
+
+                try {
+                    const requests = await getAllData('requests');
+                    if (requests.length === 0) {
+                        noRequestsFoundMessage.classList.remove('hidden');
+                        return;
+                    }
+                    requests.sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime());
+                    requests.forEach(request => {
+                        const absentDatesDisplay = request.absentDates && request.absentDates.length > 0 ? request.absentDates.join(', ') : 'N/A';
+                        const row = requestListBody.insertRow();
+                        row.innerHTML = `
+                            <td>${request.volunteerName}</td>
+                            <td>${request.requestDate}</td>
+                            <td>${request.requestType}</td>
+                            <td>${request.details}</td>
+                            <td>${absentDatesDisplay}</td>
+                            <td>
+                                <select class="request-status-select p-1 border rounded-md" data-id="${request.id}">
+                                    <option value="Pending" ${request.status === 'Pending' ? 'selected' : ''}>Pending</option>
+                                    <option value="Approved" ${request.status === 'Approved' ? 'selected' : ''}>Approved</option>
+                                    <option value="Rejected" ${request.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
+                                </select>
+                            </td>
+                            <td><button class="btn-danger text-sm px-2 py-1 request-delete-btn" data-id="${request.id}">Delete</button></td>
+                        `;
+                    });
+                } catch (error) {
+                    console.error('Error loading requests:', error);
+                    showMessageBox('Error', 'Failed to load request data.');
+                }
+            }
+
+            // --- Trade Reports Functions ---
+            async function loadTradeReports() {
+                const tradeSummaryDiv = document.getElementById('tradeSummary');
+                const tradeFilterSelect = document.getElementById('tradeFilterSelect');
+                const noTradeSummaryMessage = document.getElementById('noTradeSummary');
+
+                try {
+                    const volunteers = await getAllData('volunteers');
+                    const trades = {};
+                    const uniqueTrades = new Set();
+
+                    volunteers.forEach(volunteer => {
+                        const trade = volunteer.trade || 'Unassigned';
+                        if (!trades[trade]) trades[trade] = 0;
+                        trades[trade]++;
+                        uniqueTrades.add(trade);
+                    });
+
+                    tradeSummaryDiv.innerHTML = '';
+                    noTradeSummaryMessage.classList.toggle('hidden', volunteers.length > 0);
+
+                    if (volunteers.length > 0) {
+                        Object.keys(trades).sort().forEach(trade => {
+                            const tradeCountDiv = document.createElement('div');
+                            tradeCountDiv.className = 'p-3 bg-green-100 rounded-md shadow-sm';
+                            tradeCountDiv.innerHTML = `<p class="font-semibold text-green-800">${trade}: <span class="text-xl">${trades[trade]}</span></p>`;
+                            tradeSummaryDiv.appendChild(tradeCountDiv);
+                        });
+                    }
+
+                    tradeFilterSelect.innerHTML = '<option value="">-- All Trades --</option>';
+                    Array.from(uniqueTrades).sort().forEach(trade => {
+                        const option = document.createElement('option');
+                        option.value = trade;
+                        option.textContent = trade;
+                        tradeFilterSelect.appendChild(option);
+                    });
+
+                    filterVolunteersByTrade(tradeFilterSelect.value);
+                } catch (error) {
+                    console.error('Error loading trade reports:', error);
+                    showMessageBox('Error', 'Failed to load trade report data.');
+                }
+            }
+
+            function filterVolunteersByTrade(selectedTrade) {
+                const volunteersByTradeListBody = document.getElementById('volunteersByTradeList');
+                const noVolunteersByTradeMessage = document.getElementById('noVolunteersByTrade');
+                volunteersByTradeListBody.innerHTML = '';
+
+                let filtered = selectedTrade ? allVolunteers.filter(v => (v.trade || 'Unassigned') === selectedTrade) : allVolunteers;
+                
+                noVolunteersByTradeMessage.classList.toggle('hidden', filtered.length > 0);
+
+                filtered.sort((a,b) => (a.fullName || '').localeCompare(b.fullName || ''));
+                
+                filtered.forEach(v => {
+                    const age = calculateAge(v.birthDate);
+                    const row = volunteersByTradeListBody.insertRow();
+                    row.innerHTML = `
+                        <td>${v.assignedNumber || ''}</td>
+                        <td>${v.fullName || ''}</td>
+                        <td>${v.trade || ''}</td>
+                        <td>${age !== 'N/A' ? age : ''}</td>
+                        <td>${v.homeAddress || ''}</td>
+                    `;
+                });
+            }
+
+            // --- Dropdown Population ---
+            async function populateVolunteerDropdowns() {
+                const volunteers = await getAllData('volunteers');
+                volunteers.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
+                
+                const taskSelect = document.getElementById('taskVolunteerSelect');
+                const requestDatalist = document.getElementById('volunteerDatalist');
+                const summaryDatalist = document.getElementById('summaryVolunteerDatalist');
+
+                taskSelect.innerHTML = '<option value="">-- Select a Volunteer --</option>';
+                requestDatalist.innerHTML = '';
+                summaryDatalist.innerHTML = '';
+
+                volunteers.forEach(v => {
+                    const option = document.createElement('option');
+                    option.value = v.id;
+                    option.textContent = `${v.fullName} (No: ${v.assignedNumber})`;
+                    
+                    taskSelect.appendChild(option.cloneNode(true));
+                    
+                    const dataListOption = document.createElement('option');
+                    dataListOption.value = `${v.fullName} (No: ${v.assignedNumber})`;
+                    dataListOption.dataset.id = v.id; // Store id separately
+                    
+                    requestDatalist.appendChild(dataListOption.cloneNode(true));
+                    summaryDatalist.appendChild(dataListOption.cloneNode(true));
+                });
+            }
+
+            // --- Tab Switching and Data Loading ---
+            function loadAllData() {
+                loadVolunteers();
+                loadAttendanceRecords();
+                loadTasks();
+                loadRequests();
+                loadTradeReports();
+                populateVolunteerDropdowns();
+                loadVolunteersByArea();
+            }
+
+            function switchTab(tabId) {
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+
+                document.querySelector(`.tab-button[data-tab="${tabId}"]`).classList.add('active');
+                document.getElementById(tabId).classList.remove('hidden');
+
+                // Refresh data for the selected tab
+                if (tabId === 'volunteers') {
+                    loadVolunteers();
+                    document.getElementById('volunteerFormContainer').classList.add('hidden');
+                    document.getElementById('volunteerDetailView').classList.add('hidden');
+                    document.getElementById('volunteerCardView').classList.remove('hidden');
+                } else if (tabId === 'attendance') {
+                    loadAttendanceRecords();
+                } else if (tabId === 'tasks') {
+                    loadTasks();
+                    loadVolunteersByArea();
+                } else if (tabId === 'requests') {
+                    loadRequests();
+                } else if (tabId === 'tradeReports') {
+                    loadTradeReports();
+                }
+            }
+
+            // --- Excel Import Functions ---
+            function handleExcelFile(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                    
+                    if (jsonData.length < 2) {
+                        showMessageBox('Error', 'The Excel file is empty or does not contain a header row.');
+                        return;
+                    }
+
+                    const headers = jsonData[0];
+                    excelDataToImport = jsonData.slice(1);
+                    
+                    openMappingModal(headers);
+                };
+                reader.onerror = () => showMessageBox('Error', 'Failed to read the file.');
+                reader.readAsArrayBuffer(file);
+                event.target.value = '';
+            }
+
+            function openMappingModal(headers) {
+                const mappingContainer = document.getElementById('importMappingContainer');
+                mappingContainer.innerHTML = '';
+
+                const appFields = {
+                    fullName: 'Full Name *',
+                    assignedNumber: 'Assigned Number *',
+                    contactNumber: 'Contact Number',
+                    trade: 'Trade',
+                    maritalStatus: 'Marital Status',
+                    homeAddress: 'Home Address',
+                    birthDate: 'Birth Date (YYYY-MM-DD)',
+                    bloodType: 'Blood Type',
+                    medicalCondition: 'Medical Condition',
+                    emergencyContactPerson: 'Emergency Contact Person',
+                    emergencyContactNumber: "Emergency Contact Number",
+                    spouseName: 'Spouse Name',
+                    spouseContactNumber: "Spouse's Contact",
+                    weddingAnniversary: 'Wedding Anniversary',
+                    churchCongregation: 'Church Congregation'
+                };
+
+                for (const [fieldKey, fieldLabel] of Object.entries(appFields)) {
+                    const fieldDiv = document.createElement('div');
+                    fieldDiv.className = 'form-group';
+                    const label = document.createElement('label');
+                    label.textContent = fieldLabel;
+                    label.htmlFor = `map-${fieldKey}`;
+                    
+                    const select = document.createElement('select');
+                    select.id = `map-${fieldKey}`;
+                    select.dataset.field = fieldKey;
+                    select.className = 'mt-1';
+
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = 'SKIP';
+                    defaultOption.textContent = '-- Do not import --';
+                    select.appendChild(defaultOption);
+
+                    headers.forEach((header, index) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = header;
+                        select.appendChild(option);
+                    });
+                    
+                    fieldDiv.appendChild(label);
+                    fieldDiv.appendChild(select);
+                    mappingContainer.appendChild(fieldDiv);
+                }
+
+                document.getElementById('importMappingModalOverlay').classList.remove('hidden');
+                document.getElementById('importMappingModal').classList.remove('hidden');
+            }
+
+            async function processImport() {
+                const mapping = {};
+                document.querySelectorAll('#importMappingContainer select').forEach(select => {
+                    if (select.value !== 'SKIP') {
+                        mapping[select.dataset.field] = parseInt(select.value);
+                    }
+                });
+
+                if (!('fullName' in mapping) || !('assignedNumber' in mapping)) {
+                    showMessageBox('Error', 'Full Name and Assigned Number must be mapped to import.');
+                    return;
+                }
+
+                newVolunteersToImport = [];
+                duplicateVolunteersToProcess = [];
+
+                for (const row of excelDataToImport) {
+                    const assignedNumber = row[mapping.assignedNumber] ? String(row[mapping.assignedNumber]) : null;
+                    const fullName = row[mapping.fullName] || '';
+                    if (!assignedNumber || !fullName) continue;
+
+                    const volunteerData = {
+                        fullName,
+                        assignedNumber,
+                        contactNumber: row[mapping.contactNumber] || '',
+                        trade: row[mapping.trade] || '',
+                        maritalStatus: row[mapping.maritalStatus] || '',
+                        homeAddress: row[mapping.homeAddress] || '',
+                        birthDate: row[mapping.birthDate] || '',
+                        bloodType: row[mapping.bloodType] || '',
+                        medicalCondition: row[mapping.medicalCondition] || '',
+                        emergencyContactPerson: row[mapping.emergencyContactPerson] || '',
+                        emergencyContactNumber: row[mapping.emergencyContactNumber] || '',
+                        spouseName: row[mapping.spouseName] || '',
+                        spouseContactNumber: row[mapping.spouseContactNumber] || '',
+                        weddingAnniversary: row[mapping.weddingAnniversary] || '',
+                        churchCongregation: row[mapping.churchCongregation] || '',
+                        children: [],
+                        picture: ''
+                    };
+
+                    const existing = await getDataByIndex('volunteers', 'assignedNumber', assignedNumber);
+                    if (existing.length > 0) {
+                        volunteerData.id = existing[0].id; // Keep track of existing ID for update
+                        duplicateVolunteersToProcess.push({ new: volunteerData, old: existing[0] });
+                    } else {
+                        newVolunteersToImport.push(volunteerData);
+                    }
+                }
+
+                document.getElementById('importMappingModalOverlay').classList.add('hidden');
+                document.getElementById('importMappingModal').classList.add('hidden');
+
+                if (duplicateVolunteersToProcess.length > 0) {
+                    showDuplicateModal();
+                } else {
+                    await finalizeImport();
+                }
+            }
+
+            function showDuplicateModal() {
+                const container = document.getElementById('duplicateListContainer');
+                container.innerHTML = '';
+
+                duplicateVolunteersToProcess.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'p-4 border rounded-lg mb-4 bg-gray-50';
+                    div.innerHTML = `
+                        <h4 class="font-bold text-lg">${item.new.fullName} (No: ${item.new.assignedNumber})</h4>
+                        <div class="text-sm text-gray-600 grid grid-cols-2 gap-x-4">
+                           <div><strong>Existing:</strong> ${item.old.trade}, ${item.old.contactNumber || 'No Contact'}</div>
+                           <div><strong>New:</strong> ${item.new.trade}, ${item.new.contactNumber || 'No Contact'}</div>
+                        </div>
+                        <div class="mt-2 flex justify-end space-x-4">
+                            <label class="flex items-center"><input type="radio" name="duplicate_action_${index}" value="update" class="mr-2" checked>Update</label>
+                            <label class="flex items-center"><input type="radio" name="duplicate_action_${index}" value="ignore" class="mr-2">Ignore</label>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+
+                document.getElementById('duplicateModalOverlay').classList.remove('hidden');
+                document.getElementById('duplicateModal').classList.remove('hidden');
+            }
+            
+            async function finalizeImport() {
+                let updatedCount = 0;
+                let ignoredCount = 0;
+                let newCount = 0;
+
+                // Process duplicates based on user choice
+                document.querySelectorAll('#duplicateListContainer > div').forEach((div, index) => {
+                    const choice = div.querySelector('input[type="radio"]:checked').value;
+                    if (choice === 'update') {
+                        updateData('volunteers', duplicateVolunteersToProcess[index].new);
+                        updatedCount++;
+                    } else {
+                        ignoredCount++;
+                    }
+                });
+
+                // Add new volunteers
+                for (const volunteer of newVolunteersToImport) {
+                    await addData('volunteers', volunteer);
+                    newCount++;
+                }
+                
+                showMessageBox('Import Complete', `${newCount} new volunteers added, ${updatedCount} updated, and ${ignoredCount} ignored.`);
+                document.getElementById('duplicateModalOverlay').classList.add('hidden');
+                document.getElementById('duplicateModal').classList.add('hidden');
+                loadAllData();
+            }
+
+            // --- Delete All Data Functions ---
+            function confirmDeleteAllData() {
+                showMessageBox('Delete All Data?', 'Are you sure you want to permanently delete all data? This action cannot be undone.', true,
+                    () => { // onConfirm
+                        const modalOverlay = document.getElementById('finalDeleteModalOverlay');
+                        const modal = document.getElementById('finalDeleteModal');
+                        const input = document.getElementById('deleteConfirmationInput');
+                        const finalDeleteBtn = document.getElementById('finalDeleteBtn');
+                        
+                        input.value = '';
+                        finalDeleteBtn.disabled = true;
+                        modalOverlay.classList.remove('hidden');
+                        modal.classList.remove('hidden');
+                    }
+                );
+            }
+
+            async function deleteAllData() {
+                try {
+                    const stores = ['volunteers', 'attendance', 'tasks', 'requests'];
+                    const transaction = db.transaction(stores, 'readwrite');
+                    for (const storeName of stores) {
+                        transaction.objectStore(storeName).clear();
+                    }
+                    transaction.oncomplete = () => {
+                        showMessageBox('Success', 'All data has been successfully deleted.');
+                        loadAllData();
+                    };
+                    transaction.onerror = (e) => {
+                         showMessageBox('Error', 'Failed to delete all data: ' + e.target.error);
+                    };
+                } catch (error) {
+                    showMessageBox('Error', 'An error occurred while trying to delete data.');
+                }
+                document.getElementById('finalDeleteModalOverlay').classList.add('hidden');
+                document.getElementById('finalDeleteModal').classList.add('hidden');
+            }
+
+
+            // --- Application Initialization ---
+            document.addEventListener('DOMContentLoaded', async () => {
+                try {
+                    await openDB();
+                } catch (error) {
+                    showMessageBox('Critical Error', 'The application database could not be opened. Please try refreshing the page or clearing your browser cache. The application may not function correctly.');
+                    return; // Stop execution if DB fails
+                }
+                
+                // Get all DOM elements once
+                const volunteerForm = document.getElementById('volunteerForm');
+                const volunteerFormContainer = document.getElementById('volunteerFormContainer');
+                const addNewVolunteerBtn = document.getElementById('addNewVolunteerBtn');
+                const importExcelBtn = document.getElementById('importExcelBtn');
+                const excelFileInput = document.getElementById('excelFileInput');
+                const volunteerSearchInput = document.getElementById('volunteerSearch');
+                const clearSearchBtn = document.getElementById('clearSearchBtn');
+                const sortVolunteersBy = document.getElementById('sortVolunteersBy');
+                const backToVolunteerListBtn = document.getElementById('backToVolunteerListBtn');
+                const maritalStatusSelect = document.getElementById('maritalStatus');
+                const addChildBtn = document.getElementById('addChildBtn');
+                const pictureDropArea = document.getElementById('pictureDropArea');
+                const pictureUploadInput = document.getElementById('pictureUploadInput');
+                const clearPictureBtn = document.getElementById('clearPictureBtn');
+                const clearVolunteerFormBtn = document.getElementById('clearVolunteerForm');
+                const editVolunteerBtn = document.getElementById('editVolunteerBtn');
+                const deleteVolunteerBtn = document.getElementById('deleteVolunteerBtn');
+                const viewHistoryBtn = document.getElementById('viewHistoryBtn');
+                const volunteerCardList = document.getElementById('volunteerCardList');
+                const childrenInfoContainer = document.getElementById('childrenInfoContainer');
+                const birthDateInput = document.getElementById('birthDate');
+
+                const addAbsenteeFieldBtn = document.getElementById('addAbsenteeFieldBtn');
+                const recordAbsencesBtn = document.getElementById('recordAbsencesBtn');
+                const absenteeInputContainer = document.getElementById('absenteeInputContainer');
+
+                const taskForm = document.getElementById('taskForm');
+                const clearTaskFormBtn = document.getElementById('clearTaskForm');
+                const taskListBody = document.getElementById('taskList');
+
+                const requestForm = document.getElementById('requestForm');
+                const requestTypeSelect = document.getElementById('requestType');
+                const addAbsentDateBtn = document.getElementById('addAbsentDateBtn');
+                const clearRequestFormBtn = document.getElementById('clearRequestForm');
+                const showTotalRequestsBtn = document.getElementById('showTotalRequestsBtn');
+                const requestListBody = document.getElementById('requestList');
+
+                const tradeFilterSelect = document.getElementById('tradeFilterSelect');
+                const closeProjectHistoryModalBtn = document.getElementById('closeProjectHistoryModalBtn');
+                
+                const processImportBtn = document.getElementById('processImportBtn');
+                const cancelImportBtn = document.getElementById('cancelImportBtn');
+                const confirmDuplicateChoicesBtn = document.getElementById('confirmDuplicateChoicesBtn');
+                const cancelDuplicateBtn = document.getElementById('cancelDuplicateBtn');
+                
+                const deleteAllDataBtn = document.getElementById('deleteAllDataBtn');
+                const finalDeleteModalOverlay = document.getElementById('finalDeleteModalOverlay');
+                const finalDeleteModal = document.getElementById('finalDeleteModal');
+                const deleteConfirmationInput = document.getElementById('deleteConfirmationInput');
+                const finalDeleteBtn = document.getElementById('finalDeleteBtn');
+                const cancelFinalDeleteBtn = document.getElementById('cancelFinalDeleteBtn');
+
+
+                // --- Attach Event Listeners ---
+
+                // Tab Navigation
+                document.querySelectorAll('.tab-button').forEach(button => {
+                    button.addEventListener('click', () => switchTab(button.dataset.tab));
+                });
+
+                // Volunteer Tab
+                addNewVolunteerBtn.addEventListener('click', () => {
+                    volunteerFormContainer.classList.remove('hidden');
+                    clearVolunteerForm(false);
+                });
+                importExcelBtn.addEventListener('click', () => excelFileInput.click());
+                excelFileInput.addEventListener('change', handleExcelFile);
+
+                clearVolunteerFormBtn.addEventListener('click', () => clearVolunteerForm(true));
+                volunteerSearchInput.addEventListener('input', (e) => filterVolunteers(e.target.value));
+                clearSearchBtn.addEventListener('click', () => {
+                    volunteerSearchInput.value = '';
+                    filterVolunteers('');
+                });
+                sortVolunteersBy.addEventListener('change', () => filterVolunteers(volunteerSearchInput.value));
+                backToVolunteerListBtn.addEventListener('click', hideVolunteerDetail);
+                editVolunteerBtn.addEventListener('click', () => editVolunteer(currentDetailVolunteerId));
+                deleteVolunteerBtn.addEventListener('click', () => confirmDeleteVolunteer(currentDetailVolunteerId));
+                viewHistoryBtn.addEventListener('click', async () => {
+                     const volunteer = await getDataById('volunteers', currentDetailVolunteerId);
+                     window.viewVolunteerProjectHistory(currentDetailVolunteerId, volunteer.fullName);
+                });
+
+                // Event delegation for dynamically created cards
+                volunteerCardList.addEventListener('click', (e) => {
+                    const card = e.target.closest('.volunteer-card');
+                    if (e.target.classList.contains('volunteer-card-delete-btn')) {
+                        e.stopPropagation();
+                        confirmDeleteVolunteer(parseInt(e.target.dataset.id));
+                    } else if (card) {
+                        showVolunteerDetail(parseInt(card.dataset.volunteerId));
+                    }
+                });
+                
+                // Volunteer Form
+                volunteerForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const volunteerId = document.getElementById('volunteerId').value;
+                    
+                    const children = Array.from(childrenInfoContainer.querySelectorAll('.child-entry')).map(row => ({
+                        name: row.querySelector('.child-name').value.trim(),
+                        birthDate: row.querySelector('.child-birth-date').value
+                    })).filter(child => child.name);
+
+                    const volunteer = {
+                        fullName: document.getElementById('fullName').value.trim(),
+                        assignedNumber: document.getElementById('assignedNumber').value.trim(),
+                        contactNumber: document.getElementById('contactNumber').value.trim(),
+                        trade: document.getElementById('trade').value,
+                        maritalStatus: maritalStatusSelect.value,
+                        homeAddress: document.getElementById('homeAddress').value.trim(),
+                        birthDate: birthDateInput.value,
+                        bloodType: document.getElementById('bloodType').value,
+                        medicalCondition: document.getElementById('medicalCondition').value.trim(),
+                        emergencyContactPerson: document.getElementById('emergencyContactPerson').value.trim(),
+                        emergencyContactNumber: document.getElementById('emergencyContactNumber').value.trim(),
+                        spouseName: document.getElementById('spouseName').value.trim(),
+                        spouseContactNumber: document.getElementById('spouseContactNumber').value.trim(),
+                        weddingAnniversary: document.getElementById('weddingAnniversary').value,
+                        churchCongregation: document.getElementById('churchCongregation').value.trim(),
+                        children: children,
+                        picture: document.getElementById('picturePreview').src.startsWith('data:image') ? document.getElementById('picturePreview').src : ''
+                    };
+
+                    try {
+                        if (volunteerId) {
+                            volunteer.id = parseInt(volunteerId);
+                            await updateData('volunteers', volunteer);
+                            showMessageBox('Success', 'Volunteer updated successfully!');
+                        } else {
+                            await addData('volunteers', volunteer);
+                            showMessageBox('Success', 'Volunteer added successfully!');
+                        }
+                        clearVolunteerForm(true);
+                        loadAllData();
+                    } catch (error) {
+                        if (error.name === 'ConstraintError') {
+                            showMessageBox('Error', 'A volunteer with this Assigned Number already exists.');
+                        } else {
+                            showMessageBox('Error', `Failed to save volunteer: ${error.message}`);
+                        }
+                    }
+                });
+
+                birthDateInput.addEventListener('change', (e) => {
+                    const age = calculateAge(e.target.value);
+                    document.getElementById('volunteerAge').textContent = age !== 'N/A' ? `(${age} years old)` : '';
+                });
+                maritalStatusSelect.addEventListener('change', toggleChildrenFields);
+                addChildBtn.addEventListener('click', () => addChildInputRow());
+                childrenInfoContainer.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('remove-child-row')) {
+                        e.target.closest('.child-entry').remove();
+                    }
+                });
+                childrenInfoContainer.addEventListener('change', (e) => {
+                    if (e.target.classList.contains('child-birth-date')) {
+                        const age = calculateAge(e.target.value);
+                        e.target.nextElementSibling.textContent = age !== 'N/A' ? `(${age} years old)` : '';
+                    }
+                });
+
+                // Picture Upload
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    pictureDropArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
+                    document.body.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
+                });
+                pictureDropArea.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+                pictureUploadInput.addEventListener('change', e => handleFiles(e.target.files));
+                document.addEventListener('paste', e => handleFiles(e.clipboardData.files));
+                clearPictureBtn.addEventListener('click', () => {
+                    document.getElementById('picturePreview').style.display = 'none';
+                    document.getElementById('picturePreview').src = '#';
+                    pictureUploadInput.value = '';
+                });
+                
+                // Attendance Tab
+                addAbsenteeFieldBtn.addEventListener('click', addAbsenteeInputRow);
+                absenteeInputContainer.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('remove-absentee-row')) {
+                        e.target.closest('.absentee-entry').remove();
+                    }
+                });
+                recordAbsencesBtn.addEventListener('click', async () => {
+                    const entries = Array.from(absenteeInputContainer.querySelectorAll('.absentee-entry'));
+                    if (entries.length === 0) return;
+
+                    let successCount = 0;
+                    const today = new Date().toISOString().split('T')[0];
+
+                    for (const entry of entries) {
+                        const assignedNumber = entry.querySelector('.absent-assigned-number').value.trim();
+                        const reason = entry.querySelector('.absence-reason').value.trim();
+                        if (!assignedNumber || !reason) continue;
+
+                        const volunteers = await getDataByIndex('volunteers', 'assignedNumber', assignedNumber);
+                        if (volunteers.length > 0) {
+                            const volunteer = volunteers[0];
+                            const existing = await getDataByIndex('attendance', 'volunteerIdAndDate', [volunteer.id, today]);
+                            const record = { volunteerId: volunteer.id, volunteerName: volunteer.fullName, date: today, status: 'Absent', reason };
+                            if (existing.length > 0) {
+                                record.id = existing[0].id;
+                                await updateData('attendance', record);
+                            } else {
+                                await addData('attendance', record);
+                            }
+                            successCount++;
+                        }
+                    }
+                    showMessageBox('Success', `${successCount} absentee(s) recorded.`);
+                    absenteeInputContainer.innerHTML = '';
+                    addAbsenteeInputRow();
+                    loadAttendanceRecords();
+                });
+
+                // Task Tab
+                taskForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const taskId = document.getElementById('taskId').value;
+                    const volunteerSelect = document.getElementById('taskVolunteerSelect');
+                    const task = {
+                        assignedToVolunteerId: parseInt(volunteerSelect.value),
+                        assignedToVolunteerName: volunteerSelect.options[volunteerSelect.selectedIndex].text,
+                        project: document.getElementById('taskProject').value,
+                        area: document.getElementById('taskArea').value,
+                        description: document.getElementById('taskDescription').value
+                    };
+                    try {
+                        if (taskId) {
+                            task.id = parseInt(taskId);
+                            await updateData('tasks', task);
+                            showMessageBox('Success', 'Task updated successfully!');
+                        } else {
+                            await addData('tasks', task);
+                            showMessageBox('Success', 'Task added successfully!');
+                        }
+                        taskForm.reset();
+                        document.getElementById('taskId').value = '';
+                        loadTasks();
+                        loadVolunteersByArea();
+                    } catch (error) {
+                        showMessageBox('Error', `Failed to save task: ${error.message}`);
+                    }
+                });
+                clearTaskFormBtn.addEventListener('click', () => {
+                    taskForm.reset();
+                    document.getElementById('taskId').value = '';
+                });
+                taskListBody.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('task-edit-btn')) {
+                        window.editTask(parseInt(e.target.dataset.id));
+                    } else if (e.target.classList.contains('task-delete-btn')) {
+                        window.confirmDeleteTask(parseInt(e.target.dataset.id));
+                    }
+                });
+                closeProjectHistoryModalBtn.addEventListener('click', () => {
+                    document.getElementById('projectHistoryModal').classList.add('hidden');
+                    document.getElementById('projectHistoryModalOverlay').classList.add('hidden');
+                });
+                
+                // Request Tab
+                requestForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const identifier = document.getElementById('requestVolunteerIdentifier').value;
+                    const option = Array.from(document.getElementById('volunteerDatalist').options).find(opt => opt.value === identifier);
+                    if (!option) {
+                        showMessageBox('Error', 'Please select a valid volunteer from the list.');
+                        return;
+                    }
+                    const volunteerId = parseInt(option.dataset.id);
+                    const volunteerName = identifier.split(' (No:')[0];
+                    const absentDates = Array.from(document.querySelectorAll('.absent-date-input')).map(i => i.value).filter(Boolean);
+
+                    const newRequest = {
+                        volunteerId, volunteerName,
+                        requestDate: new Date().toISOString().split('T')[0],
+                        requestType: requestTypeSelect.value,
+                        details: document.getElementById('requestDetails').value,
+                        absentDates,
+                        status: 'Pending'
+                    };
+                    await addData('requests', newRequest);
+                    showMessageBox('Success', 'Request submitted!');
+                    requestForm.reset();
+                    loadRequests();
+                });
+                requestTypeSelect.addEventListener('change', (e) => {
+                    document.getElementById('absenceDatesSection').classList.toggle('hidden', e.target.value !== 'Leave Request');
+                });
+                addAbsentDateBtn.addEventListener('click', () => addAbsentDateInput());
+                document.getElementById('absentDatesContainer').addEventListener('click', (e) => {
+                    if (e.target.classList.contains('remove-absent-date-row')) {
+                        e.target.closest('.absent-date-entry').remove();
+                    }
+                });
+                clearRequestFormBtn.addEventListener('click', () => requestForm.reset());
+                requestListBody.addEventListener('change', async (e) => {
+                    if (e.target.classList.contains('request-status-select')) {
+                        const requestId = parseInt(e.target.dataset.id);
+                        const newStatus = e.target.value;
+                        const request = await getDataById('requests', requestId);
+                        if (request) {
+                            request.status = newStatus;
+                            await updateData('requests', request);
+                            showMessageBox('Success', 'Request status updated.');
+                        }
+                    }
+                });
+                 requestListBody.addEventListener('click', async (e) => {
+                    if (e.target.classList.contains('request-delete-btn')) {
+                         const requestId = parseInt(e.target.dataset.id);
+                         showMessageBox('Confirm Deletion', 'Are you sure you want to delete this request?', true, async () => {
+                             await deleteData('requests', requestId);
+                             showMessageBox('Success', 'Request deleted.');
+                             loadRequests();
+                         });
+                    }
+                });
+                
+                // Trade Reports Tab
+                tradeFilterSelect.addEventListener('change', e => filterVolunteersByTrade(e.target.value));
+
+                // Import Modal
+                processImportBtn.addEventListener('click', processImport);
+                cancelImportBtn.addEventListener('click', () => {
+                    document.getElementById('importMappingModalOverlay').classList.add('hidden');
+                    document.getElementById('importMappingModal').classList.add('hidden');
+                });
+                
+                // Duplicate Modal
+                confirmDuplicateChoicesBtn.addEventListener('click', finalizeImport);
+                cancelDuplicateBtn.addEventListener('click', () => {
+                    document.getElementById('duplicateModalOverlay').classList.add('hidden');
+                    document.getElementById('duplicateModal').classList.add('hidden');
+                });
+
+                // Delete All Data
+                deleteAllDataBtn.addEventListener('click', confirmDeleteAllData);
+                cancelFinalDeleteBtn.addEventListener('click', () => {
+                    finalDeleteModalOverlay.classList.add('hidden');
+                    finalDeleteModal.classList.add('hidden');
+                });
+                deleteConfirmationInput.addEventListener('input', (e) => {
+                    finalDeleteBtn.disabled = e.target.value !== 'DELETE';
+                });
+                finalDeleteBtn.addEventListener('click', deleteAllData);
+
+
+                // Initial Load
+                loadAllData();
+                switchTab('volunteers');
+            });
+        })();
+    </script>
+</body>
+</html>

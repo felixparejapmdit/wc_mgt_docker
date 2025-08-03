@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  wc_mgt:
+    build: .
+    ports:
+      - "3442:80"
+    restart: unless-stopped
+    container_name: wc_mgt
