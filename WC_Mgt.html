@@ -14,20 +14,27 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
- <div class="flex justify-end items-center p-4">
-  <a href="passcode.html" class="flex items-center space-x-2 text-red-600 hover:text-red-800 transition" title="Logout">
-    <!-- Simple logout icon (right arrow) -->
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-      <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h9.586l-3.293-3.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 11-1.414-1.414L13.586 11H4a1 1 0 01-1-1z" clip-rule="evenodd" />
-    </svg>
-    <span class="text-sm font-medium">Logout</span>
-  </a>
-</div>
+<!-- Fixed Navbar Header -->
+<header class="fixed top-0 left-0 w-full bg-white shadow z-50">
+  <div class="max-w-screen-2xl mx-auto px-4 py-4 flex justify-between items-center">
+    <h1 class="text-2xl md:text-3xl font-bold text-blue-800">
+      Construction Volunteer Management System
+    </h1>
+
+    <a href="passcode.html" class="flex items-center space-x-2 text-red-600 hover:text-red-800 transition" title="Logout">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h9.586l-3.293-3.293a1 1 0 111.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 11-1.414-1.414L13.586 11H4a1 1 0 01-1-1z" clip-rule="evenodd" />
+      </svg>
+      <span class="text-sm font-medium">Logout</span>
+    </a>
+  </div>
+</header>
 
 
-    <div class="container max-w-screen-2xl">
-        <h1 class="text-4xl font-bold text-center mb-8 text-blue-800">Construction Volunteer Management System</h1>
 
+
+    <div class="container max-w-screen-2xl pt-20 px-4 mx-auto">
+       
         <!-- Tab Navigation -->
         <div class="flex justify-center flex-wrap gap-2 mb-8">
             <button class="tab-button active" data-tab="volunteers">Volunteer Management</button>
