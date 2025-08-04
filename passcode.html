@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Enter Passcode</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #e0eafc, #cfdef3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: white;
+      padding: 2rem 3rem;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 300px;
+      animation: fadeIn 0.8s ease-in-out;
+    }
+    h2 {
+      margin-bottom: 1.5rem;
+      color: #333;
+    }
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      margin-bottom: 1rem;
+      transition: border 0.3s;
+    }
+    input:focus {
+      border-color: #007bff;
+      outline: none;
+    }
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .error {
+      color: red;
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Enter Passcode</h2>
+    <input type="password" id="passcodeInput" placeholder="Enter your passcode" />
+    <button onclick="checkPasscode()">Proceed</button>
+    <div id="error" class="error"></div>
+  </div>
+
+  <script>
+    // IndexedDB setup
+    const DB_NAME = 'ConstructionDB';
+    const DB_VERSION = 11;
+    let db;
+
+    const allowedUsers = [
+      "Philippe Diaz",
+      "Mark Cresino",
+      "Ruben Tamayo",
+      "Kevin Marcelo",
+      "Richard de Asis",
+      "Remuel Marbebe",
+      "Jilmark Regencia",
+      "Willie Suratos"
+    ];
+
+    const passcodes = allowedUsers.map(name => {
+      const parts = name.trim().split(" ");
+      return (parts[0][0] + parts[parts.length - 1]).toLowerCase();  // e.g., "pdiaz"
+    });
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onsuccess = (event) => {
+          db = event.target.result;
+          resolve();
+        };
+
+        request.onerror = (event) => {
+          reject(event.target.error);
+        };
+      });
+    }
+
+    function checkIfVolunteersExist() {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction("volunteers", "readonly");
+        const store = transaction.objectStore("volunteers");
+        const request = store.count();
+
+        request.onsuccess = () => {
+          resolve(request.result > 0);
+        };
+
+        request.onerror = () => {
+          reject(request.error);
+        };
+      });
+    }
+
+    async function checkPasscode() {
+      const input = document.getElementById('passcodeInput').value.trim().toLowerCase();
+      const errorDiv = document.getElementById('error');
+
+      if (!input) {
+        errorDiv.textContent = "Passcode cannot be empty.";
+        return;
+      }
+
+      if (passcodes.includes(input)) {
+        window.location.href = "WC_Mgt.html";
+      } else {
+        errorDiv.textContent = "Invalid passcode. Try again.";
+      }
+    }
+
+    async function init() {
+      try {
+        await openDB();
+
+        const hasVolunteers = await checkIfVolunteersExist();
+        if (!hasVolunteers) {
+          window.location.href = "WC_Mgt.html";
+        }
+      } catch (err) {
+        console.warn("DB not available or object store missing. Redirecting...");
+        window.location.href = "WC_Mgt.html";
+      }
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
