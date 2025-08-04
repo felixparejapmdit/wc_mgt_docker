@@ -3,80 +3,130 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Enter Passcode</title>
+  <title>Secure Access</title>
   <style>
     * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
+
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(to right, #e0eafc, #cfdef3);
+      height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      margin: 0;
+      background: linear-gradient(135deg, #e0eafc, #cfdef3, #e0eafc);
+      background-size: 400% 400%;
+      animation: gradientShift 15s ease infinite;
     }
+
+    @keyframes gradientShift {
+      0% {background-position: 0% 50%;}
+      50% {background-position: 100% 50%;}
+      100% {background-position: 0% 50%;}
+    }
+
     .container {
-      background: white;
-      padding: 2rem 3rem;
-      border-radius: 16px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      background: #ffffff;
+      padding: 2.5rem;
+      border-radius: 18px;
+      box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+      width: 90%;
+      max-width: 340px;
       text-align: center;
-      width: 300px;
-      animation: fadeIn 0.8s ease-in-out;
+      animation: fadeIn 0.8s ease-out;
     }
+
     h2 {
-      margin-bottom: 1.5rem;
+      margin-bottom: 2rem;
+      font-size: 1.6rem;
       color: #333;
     }
-    input {
+
+    .input-group {
+      position: relative;
+      margin-bottom: 1.5rem;
+    }
+
+    .input-group input {
       width: 100%;
-      padding: 0.75rem;
+      padding: 1rem;
+      padding-left: 1rem;
       border: 1px solid #ccc;
       border-radius: 10px;
-      margin-bottom: 1rem;
-      transition: border 0.3s;
+      font-size: 1rem;
+      transition: border 0.3s, box-shadow 0.3s;
     }
-    input:focus {
+
+    .input-group input:focus {
       border-color: #007bff;
+      box-shadow: 0 0 6px rgba(0,123,255,0.2);
       outline: none;
     }
+
+    .input-group label {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: white;
+      padding: 0 0.25rem;
+      color: #888;
+      transition: all 0.2s ease;
+      pointer-events: none;
+    }
+
+    .input-group input:focus + label,
+    .input-group input:not(:placeholder-shown) + label {
+      top: 0;
+      transform: translateY(-50%) scale(0.85);
+      background: white;
+      color: #007bff;
+    }
+
     button {
       width: 100%;
-      padding: 0.75rem;
+      padding: 0.9rem;
       background-color: #007bff;
       color: white;
+      font-size: 1rem;
       border: none;
       border-radius: 10px;
-      font-weight: bold;
       cursor: pointer;
-      transition: background 0.3s;
+      font-weight: bold;
+      transition: background 0.3s ease;
     }
+
     button:hover {
       background-color: #0056b3;
     }
+
     .error {
-      color: red;
-      font-size: 0.9rem;
-      margin-top: 0.5rem;
+      margin-top: 0.75rem;
+      color: #d9534f;
+      font-size: 0.95rem;
     }
+
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {opacity: 0; transform: translateY(10px);}
+      to {opacity: 1; transform: translateY(0);}
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Enter Passcode</h2>
-    <input type="password" id="passcodeInput" placeholder="Enter your passcode" />
+    <div class="input-group">
+      <input type="password" id="passcodeInput" placeholder=" " />
+      <label for="passcodeInput">Enter your passcode</label>
+    </div>
     <button onclick="checkPasscode()">Proceed</button>
     <div id="error" class="error"></div>
   </div>
 
   <script>
-    // IndexedDB setup
     const DB_NAME = 'ConstructionDB';
     const DB_VERSION = 11;
     let db;
@@ -94,7 +144,7 @@
 
     const passcodes = allowedUsers.map(name => {
       const parts = name.trim().split(" ");
-      return (parts[0][0] + parts[parts.length - 1]).toLowerCase();  // e.g., "pdiaz"
+      return (parts[0][0] + parts[parts.length - 1]).toLowerCase(); // e.g., "pdiaz"
     });
 
     function openDB() {
@@ -147,7 +197,6 @@
     async function init() {
       try {
         await openDB();
-
         const hasVolunteers = await checkIfVolunteersExist();
         if (!hasVolunteers) {
           window.location.href = "WC_Mgt.html";
