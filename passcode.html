@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Secure Access</title>
   <style>
     * {
@@ -12,69 +12,63 @@
     }
 
     body {
-      font-family: 'Segoe UI', sans-serif;
-      height: 100vh;
+      font-family: "Segoe UI", Roboto, sans-serif;
+      background-color: #f5f6fa;
       display: flex;
       justify-content: center;
       align-items: center;
-      background: linear-gradient(135deg, #e0eafc, #cfdef3, #e0eafc);
-      background-size: 400% 400%;
-      animation: gradientShift 15s ease infinite;
-    }
-
-    @keyframes gradientShift {
-      0% {background-position: 0% 50%;}
-      50% {background-position: 100% 50%;}
-      100% {background-position: 0% 50%;}
+      height: 100vh;
+      padding: 1rem;
     }
 
     .container {
-      background: #ffffff;
+      background-color: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
       padding: 2.5rem;
-      border-radius: 18px;
-      box-shadow: 0 12px 24px rgba(0,0,0,0.1);
-      width: 90%;
-      max-width: 340px;
-      text-align: center;
-      animation: fadeIn 0.8s ease-out;
+      max-width: 380px;
+      width: 100%;
+      animation: fadeIn 0.6s ease;
     }
 
     h2 {
-      margin-bottom: 2rem;
-      font-size: 1.6rem;
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
       color: #333;
+      text-align: center;
     }
 
     .input-group {
       position: relative;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.75rem;
     }
 
     .input-group input {
       width: 100%;
-      padding: 1rem;
-      padding-left: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 10px;
+      padding: 1rem 0.75rem;
+      border: 1px solid #dcdfe4;
+      border-radius: 8px;
       font-size: 1rem;
+      background-color: #fcfcfd;
       transition: border 0.3s, box-shadow 0.3s;
     }
 
     .input-group input:focus {
-      border-color: #007bff;
-      box-shadow: 0 0 6px rgba(0,123,255,0.2);
+      border-color: #5c7cfa;
+      box-shadow: 0 0 0 3px rgba(92, 124, 250, 0.2);
       outline: none;
     }
 
     .input-group label {
       position: absolute;
-      left: 1rem;
       top: 50%;
+      left: 0.75rem;
       transform: translateY(-50%);
-      background: white;
+      background: #fff;
       padding: 0 0.25rem;
-      color: #888;
-      transition: all 0.2s ease;
+      color: #999;
+      font-size: 0.95rem;
+      transition: 0.2s ease;
       pointer-events: none;
     }
 
@@ -82,55 +76,64 @@
     .input-group input:not(:placeholder-shown) + label {
       top: 0;
       transform: translateY(-50%) scale(0.85);
-      background: white;
-      color: #007bff;
+      color: #5c7cfa;
+      background: #fff;
     }
 
     button {
       width: 100%;
       padding: 0.9rem;
-      background-color: #007bff;
-      color: white;
       font-size: 1rem;
+      background-color: #5c7cfa;
+      color: white;
       border: none;
-      border-radius: 10px;
+      border-radius: 8px;
+      font-weight: 600;
       cursor: pointer;
-      font-weight: bold;
-      transition: background 0.3s ease;
+      transition: background 0.3s;
     }
 
     button:hover {
-      background-color: #0056b3;
+      background-color: #3b5bdb;
     }
 
     .error {
-      margin-top: 0.75rem;
+      margin-top: 1rem;
       color: #d9534f;
       font-size: 0.95rem;
+      text-align: center;
     }
 
     @keyframes fadeIn {
-      from {opacity: 0; transform: translateY(10px);}
-      to {opacity: 1; transform: translateY(0);}
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 2rem 1.5rem;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>Enter Passcode</h2>
+    <h2>WC Login</h2>
     <div class="input-group">
       <input type="password" id="passcodeInput" placeholder=" " />
       <label for="passcodeInput">Enter your passcode</label>
     </div>
-    <button onclick="checkPasscode()">Proceed</button>
+    <button id="proceedBtn" onclick="checkPasscode()">Proceed</button>
     <div id="error" class="error"></div>
   </div>
 
   <script>
-    const DB_NAME = 'ConstructionDB';
-    const DB_VERSION = 11;
-    let db;
-
     const allowedUsers = [
       "Philippe Diaz",
       "Mark Cresino",
@@ -139,48 +142,17 @@
       "Richard de Asis",
       "Remuel Marbebe",
       "Jilmark Regencia",
-      "Willie Suratos"
+      "Willie Suratos",
     ];
 
-    const passcodes = allowedUsers.map(name => {
+    const passcodes = allowedUsers.map((name) => {
       const parts = name.trim().split(" ");
-      return (parts[0][0] + parts[parts.length - 1]).toLowerCase(); // e.g., "pdiaz"
+      return (parts[0][0] + parts[parts.length - 1]).toLowerCase();
     });
 
-    function openDB() {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-        request.onsuccess = (event) => {
-          db = event.target.result;
-          resolve();
-        };
-
-        request.onerror = (event) => {
-          reject(event.target.error);
-        };
-      });
-    }
-
-    function checkIfVolunteersExist() {
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction("volunteers", "readonly");
-        const store = transaction.objectStore("volunteers");
-        const request = store.count();
-
-        request.onsuccess = () => {
-          resolve(request.result > 0);
-        };
-
-        request.onerror = () => {
-          reject(request.error);
-        };
-      });
-    }
-
-    async function checkPasscode() {
-      const input = document.getElementById('passcodeInput').value.trim().toLowerCase();
-      const errorDiv = document.getElementById('error');
+    function checkPasscode() {
+      const input = document.getElementById("passcodeInput").value.trim().toLowerCase();
+      const errorDiv = document.getElementById("error");
 
       if (!input) {
         errorDiv.textContent = "Passcode cannot be empty.";
@@ -194,20 +166,13 @@
       }
     }
 
-    async function init() {
-      try {
-        await openDB();
-        const hasVolunteers = await checkIfVolunteersExist();
-        if (!hasVolunteers) {
-          window.location.href = "WC_Mgt.html";
-        }
-      } catch (err) {
-        console.warn("DB not available or object store missing. Redirecting...");
-        window.location.href = "WC_Mgt.html";
+    // 🔑 Enable Enter key press to trigger the button
+    document.getElementById("passcodeInput").addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault(); // Prevent form submission (if any)
+        document.getElementById("proceedBtn").click();
       }
-    }
-
-    window.onload = init;
+    });
   </script>
 </body>
 </html>

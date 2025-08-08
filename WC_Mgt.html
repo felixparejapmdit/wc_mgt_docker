@@ -573,154 +573,144 @@
         </div>
     </div>
 
-
+    <script src="https://unpkg.com/heroicons@2.0.13/dist/heroicons.js"></script>
     <script>
         // Wrap the entire script in an IIFE to prevent global variable conflicts
         (function() {
-            // --- IndexedDB Setup ---
-            const DB_NAME = 'ConstructionDB';
-            const DB_VERSION = 11; // Incremented version for schema change
-            let db;
+            // --- Directus API Setup ---
+            const DIRECTUS_URL = 'http://172.18.162.62:8055';
+            const DIRECTUS_TOKEN = '-QIjtBjqqo360W4Vfj_2rkXmuLL_W7vJ';
 
             // Global variables
             let allVolunteers = [];
-            let currentDetailVolunteerId = null; 
+            let currentDetailVolunteerId = null;
             let excelDataToImport = null; // To hold parsed Excel data
             let newVolunteersToImport = [];
             let duplicateVolunteersToProcess = [];
             let taskDataToImport = null;
             window.workbookToImport = null; // To hold the entire workbook for sheet selection
 
+            // --- Directus API Service ---
             /**
-             * Opens and sets up the IndexedDB database.
+             * Generic fetch wrapper for Directus API
+             * @param {string} method - 'GET', 'POST', 'PATCH', 'DELETE'
+             * @param {string} path - The API path (e.g., '/items/volunteers')
+             * @param {object} [body] - The request body for POST/PATCH
+             * @returns {Promise<any>} - The JSON response from the API
              */
-            function openDB() {
-                return new Promise((resolve, reject) => {
-                    const request = indexedDB.open(DB_NAME, DB_VERSION);
+            async function directusFetch(method, path, body = null) {
+                const options = {
+                    method,
+                    headers: {
+                        'Authorization': `Bearer ${DIRECTUS_TOKEN}`,
+                    },
+                };
+                if (body) {
+                    // Do not set Content-Type for FormData, browser does it
+                    if (!(body instanceof FormData)) {
+                       options.headers['Content-Type'] = 'application/json';
+                       options.body = JSON.stringify(body);
+                    } else {
+                       options.body = body;
+                    }
+                }
 
-                    request.onupgradeneeded = function(event) {
-                        db = event.target.result;
-                        const transaction = event.target.transaction;
-                        console.log(`Upgrading database from version ${event.oldVersion} to ${event.newVersion}`);
+                const response = await fetch(`${DIRECTUS_URL}${path}`, options);
 
-                        // Re-create stores to ensure clean schema
-                        if (db.objectStoreNames.contains('volunteers')) db.deleteObjectStore('volunteers');
-                        if (db.objectStoreNames.contains('attendance')) db.deleteObjectStore('attendance');
-                        if (db.objectStoreNames.contains('tasks')) db.deleteObjectStore('tasks');
-                        if (db.objectStoreNames.contains('requests')) db.deleteObjectStore('requests');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({})); // Catch if error response is not JSON
+                    console.error('Directus API Error:', errorData);
+                    const errorMessage = errorData.errors?.[0]?.message || `HTTP error! status: ${response.status}`;
+                    throw new Error(errorMessage);
+                }
+                
+                // For 204 No Content responses (like DELETE)
+                if (response.status === 204) {
+                    return null;
+                }
 
-                        // Create object stores (tables)
-                        const volunteerStore = db.createObjectStore('volunteers', { keyPath: 'id', autoIncrement: true });
-                        volunteerStore.createIndex('assignedNumber', 'assignedNumber', { unique: true });
-                        volunteerStore.createIndex('fullName', 'fullName', { unique: false });
-                        volunteerStore.createIndex('trade', 'trade', { unique: false });
-
-                        const attendanceStore = db.createObjectStore('attendance', { keyPath: 'id', autoIncrement: true });
-                        attendanceStore.createIndex('volunteerId', 'volunteerId', { unique: false });
-                        attendanceStore.createIndex('date', 'date', { unique: false });
-                        attendanceStore.createIndex('volunteerIdAndDate', ['volunteerId', 'date'], { unique: true });
-
-                        const taskStore = db.createObjectStore('tasks', { keyPath: 'id', autoIncrement: true });
-                        taskStore.createIndex('assignedToVolunteerId', 'assignedToVolunteerId', { unique: false });
-
-                        const requestStore = db.createObjectStore('requests', { keyPath: 'id', autoIncrement: true });
-                        requestStore.createIndex('volunteerId', 'volunteerId', { unique: false });
-                        
-                        transaction.oncomplete = () => console.log('Database upgrade complete.');
-                    };
-
-                    request.onsuccess = function(event) {
-                        db = event.target.result;
-                        console.log('Database opened successfully.');
-                        resolve();
-                    };
-
-                    request.onerror = function(event) {
-                        console.error('Database error:', event.target.error);
-                        reject(event.target.error);
-                    };
-                });
+                return response.json();
             }
 
-            // --- Generic DB Helper Functions ---
-            function addData(storeName, data) {
-                return new Promise((resolve, reject) => {
-                    const transaction = db.transaction([storeName], 'readwrite');
-                    const store = transaction.objectStore(storeName);
-                    const request = store.add(data);
-                    request.onsuccess = e => resolve(e.target.result);
-                    request.onerror = e => {
-                        console.error(`Error adding to ${storeName}:`, e.target.error);
-                        reject(e.target.error);
-                    };
-                });
+            /**
+             * Uploads a file to Directus.
+             * @param {File} file - The file to upload.
+             * @returns {Promise<object>} - The API response containing the file ID.
+             */
+            async function uploadFile(file) {
+                 const formData = new FormData();
+                 formData.append('file', file);
+                 const result = await directusFetch('POST', '/files', formData);
+                 return result.data; // The file object, including its ID
             }
 
-            function updateData(storeName, data) {
-                return new Promise((resolve, reject) => {
-                    const transaction = db.transaction([storeName], 'readwrite');
-                    const store = transaction.objectStore(storeName);
-                    const request = store.put(data);
-                    request.onsuccess = () => resolve();
-                    request.onerror = e => {
-                        console.error(`Error updating in ${storeName}:`, e.target.error);
-                        reject(e.target.error);
-                    };
-                });
+
+            // --- Data Transformation Helpers ---
+            // Maps frontend camelCase to backend snake_case
+            const fieldMap = {
+                id: 'id',
+                fullName: 'full_name',
+                assignedNumber: 'assigned_number',
+                contactNumber: 'contact_number',
+                trade: 'trade',
+                maritalStatus: 'marital_status',
+                homeAddress: 'home_address',
+                birthDate: 'birth_date',
+                bloodType: 'blood_type',
+                medicalCondition: 'medical_condition',
+                emergencyContactPerson: 'emergency_contact_person',
+                emergencyContactNumber: 'emergency_contact_number',
+                spouseName: 'spouse_name',
+                spouseContactNumber: 'spouse_contact_number',
+                weddingAnniversary: 'wedding_anniversary',
+                churchCongregation: 'church_congregation',
+                picture: 'picture',
+                children: 'children'
+            };
+
+            /**
+             * Transforms a volunteer object from API format (snake_case) to app format (camelCase).
+             * @param {object} apiVolunteer - The volunteer object from the Directus API.
+             * @returns {object} - The volunteer object in the app's format.
+             */
+            function transformApiToApp(apiObject, map) {
+                const appObject = {};
+                for (const appKey in map) {
+                    const apiKey = map[appKey];
+                    if (apiObject[apiKey] !== undefined) {
+                        // Handle relational data (e.g., picture ID or children array)
+                        if (appKey === 'children' && Array.isArray(apiObject[apiKey])) {
+                             appObject[appKey] = apiObject[apiKey].map(child => ({ name: child.name, birthDate: child.birth_date, id: child.id }));
+                        } else {
+                            appObject[appKey] = apiObject[apiKey];
+                        }
+                    }
+                }
+                return appObject;
             }
 
-            function getAllData(storeName) {
-                return new Promise((resolve, reject) => {
-                    const transaction = db.transaction([storeName], 'readonly');
-                    const store = transaction.objectStore(storeName);
-                    const request = store.getAll();
-                    request.onsuccess = e => resolve(e.target.result);
-                    request.onerror = e => {
-                        console.error(`Error getting all from ${storeName}:`, e.target.error);
-                        reject(e.target.error);
-                    };
-                });
+            /**
+             * Transforms a volunteer object from app format (camelCase) to API format (snake_case).
+             * @param {object} appVolunteer - The volunteer object from the application.
+             * @returns {object} - The volunteer object ready to be sent to the API.
+             */
+            function transformAppToApi(appObject, map) {
+                const apiObject = {};
+                 for (const appKey in map) {
+                    const apiKey = map[appKey];
+                    if (appObject[appKey] !== undefined && appKey !== 'id') { // Don't include ID in the body
+                         if (appKey === 'children' && Array.isArray(appObject[appKey])) {
+                             // Format for creating/updating relational items
+                             apiObject[apiKey] = appObject[appKey].map(child => ({ name: child.name, birth_date: child.birthDate }));
+                         } else {
+                             // Handle null values for fields that might be empty
+                             apiObject[apiKey] = appObject[appKey] === '' ? null : appObject[appKey];
+                         }
+                    }
+                }
+                return apiObject;
             }
 
-            function getDataById(storeName, id) {
-                return new Promise((resolve, reject) => {
-                    const transaction = db.transaction([storeName], 'readonly');
-                    const store = transaction.objectStore(storeName);
-                    const request = store.get(id);
-                    request.onsuccess = e => resolve(e.target.result);
-                    request.onerror = e => {
-                        console.error(`Error getting by ID from ${storeName}:`, e.target.error);
-                        reject(e.target.error);
-                    };
-                });
-            }
-
-            function deleteData(storeName, id) {
-                return new Promise((resolve, reject) => {
-                    const transaction = db.transaction([storeName], 'readwrite');
-                    const store = transaction.objectStore(storeName);
-                    const request = store.delete(id);
-                    request.onsuccess = () => resolve();
-                    request.onerror = e => {
-                        console.error(`Error deleting from ${storeName}:`, e.target.error);
-                        reject(e.target.error);
-                    };
-                });
-            }
-
-            function getDataByIndex(storeName, indexName, key) {
-                return new Promise((resolve, reject) => {
-                    const transaction = db.transaction([storeName], 'readonly');
-                    const store = transaction.objectStore(storeName);
-                    const index = store.index(indexName);
-                    const request = index.getAll(key);
-                    request.onsuccess = e => resolve(e.target.result);
-                    request.onerror = e => {
-                        console.error(`Error getting by index from ${storeName}:`, e.target.error);
-                        reject(e.target.error);
-                    };
-                });
-            }
 
             // --- Utility Functions ---
             function calculateAge(birthDateString) {
@@ -772,40 +762,28 @@
                 return `${day}-${month}-${year}`;
             }
 
-async function exportData() {
-    try {
-        // Ensure DB is open
-        if (!db) await openDB();
+            async function exportData() {
+                try {
+                   const response = await directusFetch('GET', '/items/volunteers?limit=-1&fields=*,children.*' );
+                   const data = response.data;
 
-        const transaction = db.transaction('volunteers', 'readonly');
-        const store = transaction.objectStore('volunteers');
-        const request = store.getAll();
+                   const blob = new Blob([JSON.stringify(data, null, 2)], {
+                       type: 'application/json',
+                   });
+                   const url = URL.createObjectURL(blob);
 
-        request.onsuccess = function (event) {
-            const data = event.target.result;
+                   const a = document.createElement('a');
+                   a.href = url;
+                   a.download = 'volunteers_backup.json';
+                   a.click();
+                   URL.revokeObjectURL(url);
 
-            const blob = new Blob([JSON.stringify(data, null, 2)], {
-                type: 'application/json',
-            });
-            const url = URL.createObjectURL(blob);
-
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'volunteers_backup.json';
-            a.click();
-            URL.revokeObjectURL(url);
-
-            showMessageBox('Success', 'Volunteer data exported successfully.');
-        };
-
-        request.onerror = function () {
-            showMessageBox('Error', 'Failed to fetch volunteer data.');
-        };
-    } catch (error) {
-        console.error('Export failed:', error);
-        showMessageBox('Error', 'Export failed: ' + error.message);
-    }
-}
+                   showMessageBox('Success', 'Volunteer data exported successfully.');
+                } catch (error) {
+                   console.error('Export failed:', error);
+                   showMessageBox('Error', 'Export failed: ' + error.message);
+                }
+            }
 
 
             // --- UI Functions ---
@@ -847,14 +825,42 @@ async function exportData() {
                 noRegisteredVolunteersMessage.classList.add('hidden');
 
                 try {
-                    allVolunteers = await getAllData('volunteers');
+                    // First, fetch all volunteers
+                    const volunteersResponse = await directusFetch('GET', '/items/volunteers?limit=-1');
+                    const volunteers = volunteersResponse.data;
+
+                    // Then, fetch all children separately
+                    const childrenResponse = await directusFetch('GET', '/items/volunteer_children?limit=-1&fields=*');
+                    const allChildren = childrenResponse.data;
+
+                    // Group children by volunteer_id
+                    const childrenByVolunteerId = {};
+                    allChildren.forEach(child => {
+                        if (!childrenByVolunteerId[child.volunteer_id]) {
+                            childrenByVolunteerId[child.volunteer_id] = [];
+                        }
+                        childrenByVolunteerId[child.volunteer_id].push({
+                            id: child.id,
+                            name: child.name,
+                            birthDate: child.birth_date
+                        });
+                    });
+
+                    // Transform volunteers and attach their children
+                    allVolunteers = volunteers.map(volunteer => {
+                        const transformed = transformApiToApp(volunteer, fieldMap);
+                        // Attach children for this volunteer
+                        transformed.children = childrenByVolunteerId[volunteer.id] || [];
+                        return transformed;
+                    });
+
                     if (allVolunteers.length === 0) {
                         noRegisteredVolunteersMessage.classList.remove('hidden');
                     }
                     filterVolunteers(document.getElementById('volunteerSearch').value);
                 } catch (error) {
                     console.error('Error loading volunteers:', error);
-                    showMessageBox('Error', 'Failed to load volunteer data.');
+                    showMessageBox('Error', `Failed to load volunteer data: ${error.message}`);
                 }
             }
 
@@ -872,7 +878,7 @@ async function exportData() {
                 let filteredVolunteers = allVolunteers.filter(v => {
                     if (!lowerCaseSearchTerm) return true;
                     return (v.fullName && v.fullName.toLowerCase().includes(lowerCaseSearchTerm)) || 
-                           (v.assignedNumber && v.assignedNumber.toLowerCase().includes(lowerCaseSearchTerm));
+                           (v.assignedNumber && String(v.assignedNumber).toLowerCase().includes(lowerCaseSearchTerm));
                 });
 
                 // Sorting logic
@@ -901,7 +907,8 @@ async function exportData() {
 
                 filteredVolunteers.forEach(volunteer => {
                     const age = calculateAge(volunteer.birthDate);
-                    const pictureSrc = volunteer.picture || 'https://placehold.co/60x60/cbd5e1/64748b?text=No+Pic';
+                    // Build image URL from Directus asset ID
+                    const pictureSrc = volunteer.picture ? `${DIRECTUS_URL}/assets/${volunteer.picture}?width=60&height=60&fit=cover` : 'https://placehold.co/60x60/cbd5e1/64748b?text=No+Pic';
                     const card = document.createElement('div');
                     card.className = 'volunteer-card';
                     card.dataset.volunteerId = volunteer.id;
@@ -928,19 +935,21 @@ async function exportData() {
             }
             
             async function showVolunteerDetail(id) {
+                // Find volunteer from the pre-loaded global array
+                const volunteer = allVolunteers.find(v => v.id === id);
+                if (!volunteer) {
+                    showMessageBox('Error', 'Volunteer details not found.');
+                    return;
+                }
+                
                 try {
-                    const volunteer = await getDataById('volunteers', id);
-                    if (!volunteer) {
-                        showMessageBox('Error', 'Volunteer details not found.');
-                        return;
-                    }
-
                     currentDetailVolunteerId = id;
                     document.getElementById('volunteerCardView').classList.add('hidden');
                     document.getElementById('volunteerFormContainer').classList.add('hidden');
                     document.getElementById('volunteerDetailView').classList.remove('hidden');
 
-                    document.getElementById('detailPicture').src = volunteer.picture || 'https://placehold.co/150x150/cbd5e1/64748b?text=No+Pic';
+                    const pictureSrc = volunteer.picture ? `${DIRECTUS_URL}/assets/${volunteer.picture}` : 'https://placehold.co/150x150/cbd5e1/64748b?text=No+Pic';
+                    document.getElementById('detailPicture').src = pictureSrc;
                     document.getElementById('detailFullName').textContent = volunteer.fullName;
                     document.getElementById('detailAssignedNumber').textContent = `Assigned No: ${volunteer.assignedNumber || 'N/A'}`;
                     document.getElementById('detailTrade').textContent = volunteer.trade || 'N/A';
@@ -958,17 +967,21 @@ async function exportData() {
                     document.getElementById('detailWeddingAnniversary').textContent = displayDate(volunteer.weddingAnniversary);
                     document.getElementById('detailChurchCongregation').textContent = volunteer.churchCongregation || 'N/A';
 
+                    // Handle children display
                     const detailChildrenList = document.getElementById('detailChildren');
                     detailChildrenList.innerHTML = '';
+                    
+                    console.log('Volunteer children:', volunteer.children); // Debug log
+                    
                     if (volunteer.children && volunteer.children.length > 0) {
                         volunteer.children.forEach(child => {
                             const li = document.createElement('li');
                             const childAge = calculateAge(child.birthDate);
-                            li.textContent = `${child.name}${childAge !== 'N/A' ? ` (${childAge})` : ''}`;
+                            li.textContent = `${child.name}${childAge !== 'N/A' ? ` (${childAge} years old)` : ''}`;
                             detailChildrenList.appendChild(li);
                         });
                     } else {
-                        detailChildrenList.innerHTML = '<li>N/A</li>';
+                        detailChildrenList.innerHTML = '<li>No children recorded</li>';
                     }
                 } catch (error) {
                     showMessageBox('Error', `Failed to load volunteer details: ${error.message}`);
@@ -985,7 +998,8 @@ async function exportData() {
 
             window.editVolunteer = async function(id) {
                 try {
-                    const volunteer = await getDataById('volunteers', id);
+                    // Find from global array first
+                    const volunteer = allVolunteers.find(v => v.id === id);
                     if (!volunteer) {
                         showMessageBox('Error', 'Volunteer not found for editing.');
                         return;
@@ -1011,17 +1025,24 @@ async function exportData() {
                     document.getElementById('spouseContactNumber').value = volunteer.spouseContactNumber || '';
                     document.getElementById('weddingAnniversary').value = volunteer.weddingAnniversary || '';
                     document.getElementById('churchCongregation').value = volunteer.churchCongregation || '';
+                    
+                    // Store picture ID in a data attribute
+                    const picturePreview = document.getElementById('picturePreview');
+                    picturePreview.dataset.existingPictureId = volunteer.picture || '';
 
+                    // Handle children - clear container first
                     const childrenInfoContainer = document.getElementById('childrenInfoContainer');
                     childrenInfoContainer.innerHTML = '';
+                    
+                    console.log('Loading children for edit:', volunteer.children); // Debug log
+                    
                     if (volunteer.children && volunteer.children.length > 0) {
                         volunteer.children.forEach(child => addChildInputRow(child));
                     }
                     toggleChildrenFields();
-
-                    const picturePreview = document.getElementById('picturePreview');
+                    
                     if (volunteer.picture) {
-                        picturePreview.src = volunteer.picture;
+                        picturePreview.src = `${DIRECTUS_URL}/assets/${volunteer.picture}`;
                         picturePreview.style.display = 'block';
                     } else {
                         picturePreview.src = '#';
@@ -1046,18 +1067,41 @@ async function exportData() {
                     true,
                     async () => {
                         try {
-                            // Delete associated records first
-                            const tasks = await getDataByIndex('tasks', 'assignedToVolunteerId', id);
-                            for (const task of tasks) await deleteData('tasks', task.id);
-
-                            const attendance = await getDataByIndex('attendance', 'volunteerId', id);
-                            for (const record of attendance) await deleteData('attendance', record.id);
-
-                            const requests = await getDataByIndex('requests', 'volunteerId', id);
-                            for (const request of requests) await deleteData('requests', request.id);
+                            // Directus handles relational data deletion if schema is set up with 'CASCADE'.
+                            // If not, manual deletion of related items is needed. Assuming CASCADE for simplicity.
+                            // However, it's safer to delete related items manually.
                             
-                            // Finally, delete the volunteer
-                            await deleteData('volunteers', id);
+                            // 1. Find and delete related tasks
+                            const tasksRes = await directusFetch('GET', `/items/tasks?filter[assigned_to_volunteer_id][_eq]=${id}&fields=id`);
+                            if (tasksRes.data.length > 0) {
+                                const taskIds = tasksRes.data.map(t => t.id);
+                                await directusFetch('DELETE', '/items/tasks', taskIds);
+                            }
+
+                            // 2. Find and delete related attendance
+                            const attRes = await directusFetch('GET', `/items/attendance?filter[volunteer_id][_eq]=${id}&fields=id`);
+                             if (attRes.data.length > 0) {
+                                const attIds = attRes.data.map(a => a.id);
+                                await directusFetch('DELETE', '/items/attendance', attIds);
+                            }
+
+                            // 3. Find and delete related requests
+                            const reqRes = await directusFetch('GET', `/items/requests?filter[volunteer_id][_eq]=${id}&fields=id`);
+                            if (reqRes.data.length > 0) {
+                                const reqIds = reqRes.data.map(r => r.id);
+                                // Also need to delete request_absent_dates
+                                for (const reqId of reqIds) {
+                                     const absentDatesRes = await directusFetch('GET', `/items/request_absent_dates?filter[request_id][_eq]=${reqId}&fields=id`);
+                                     if(absentDatesRes.data.length > 0) {
+                                        const dateIds = absentDatesRes.data.map(d => d.id);
+                                        await directusFetch('DELETE', '/items/request_absent_dates', dateIds);
+                                     }
+                                }
+                                await directusFetch('DELETE', '/items/requests', reqIds);
+                            }
+                            
+                            // 4. Finally, delete the volunteer (children are deleted via CASCADE by Directus)
+                            await directusFetch('DELETE', `/items/volunteers/${id}`);
 
                             showMessageBox('Success', 'Volunteer and associated records deleted successfully!');
                             if (currentDetailVolunteerId === id) {
@@ -1076,11 +1120,17 @@ async function exportData() {
             }
 
             function clearVolunteerForm(hideForm = true) {
-                document.getElementById('volunteerForm').reset();
+                const form = document.getElementById('volunteerForm');
+                form.reset();
                 document.getElementById('volunteerId').value = '';
                 document.getElementById('childrenInfoContainer').innerHTML = '';
-                document.getElementById('picturePreview').style.display = 'none';
-                document.getElementById('picturePreview').src = '#';
+                
+                const picturePreview = document.getElementById('picturePreview');
+                picturePreview.style.display = 'none';
+                picturePreview.src = '#';
+                picturePreview.dataset.newFile = ''; // Clear stored file object
+                picturePreview.dataset.existingPictureId = '';
+
                 document.getElementById('pictureUploadInput').value = '';
                 document.getElementById('volunteerAge').textContent = '';
                 toggleChildrenFields();
@@ -1112,11 +1162,11 @@ async function exportData() {
                 newRow.innerHTML = `
                     <div class="form-group">
                         <label class="text-xs">Child's Name:</label>
-                        <input type="text" class="child-name mt-1" value="${child.name}" placeholder="Child's Full Name">
+                        <input type="text" class="child-name mt-1" value="${child.name || ''}" placeholder="Child's Full Name">
                     </div>
                     <div class="form-group">
                         <label class="text-xs">Birth Date:</label>
-                        <input type="date" class="child-birth-date mt-1" value="${child.birthDate}">
+                        <input type="date" class="child-birth-date mt-1" value="${child.birthDate || ''}">
                         <span class="child-age text-xs text-gray-500 ml-2"></span>
                     </div>
                     <button type="button" class="remove-child-row absolute top-1 right-1 text-red-500 hover:text-red-700 font-bold text-lg">&times;</button>
@@ -1132,12 +1182,17 @@ async function exportData() {
                     return;
                 }
                 const reader = new FileReader();
+                const picturePreview = document.getElementById('picturePreview');
+
                 reader.onload = (e) => {
-                    const picturePreview = document.getElementById('picturePreview');
-                    picturePreview.src = e.target.result;
+                    picturePreview.src = e.target.result; // Show preview
                     picturePreview.style.display = 'block';
                 };
                 reader.readAsDataURL(file);
+
+                // Store the actual file object to be uploaded later
+                picturePreview.dataset.newFile = 'true';
+                window.newPictureFile = file;
             }
 
             // --- Attendance Functions ---
@@ -1148,16 +1203,19 @@ async function exportData() {
                 noAttendanceRecordsMessage.classList.add('hidden');
 
                 try {
-                    const records = await getAllData('attendance');
+                    // Fetch attendance and related volunteer name
+                    const response = await directusFetch('GET', '/items/attendance?limit=-1&sort=-date&fields=*,volunteer_id.full_name');
+                    const records = response.data;
+                    
                     if (records.length === 0) {
                         noAttendanceRecordsMessage.classList.remove('hidden');
                         return;
                     }
-                    records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
                     records.forEach(record => {
                         const row = attendanceRecordsBody.insertRow();
                         row.innerHTML = `
-                            <td>${record.volunteerName}</td>
+                            <td>${record.volunteer_id?.full_name || 'Unknown Volunteer'}</td>
                             <td>${displayDate(record.date)}</td>
                             <td>
                                 <span class="px-2 py-1 rounded-full text-xs font-semibold ${record.status === 'Absent' ? 'bg-red-200 text-red-800' : 'bg-gray-200 text-gray-800'}">
@@ -1169,7 +1227,7 @@ async function exportData() {
                     });
                 } catch (error) {
                     console.error('Error loading attendance:', error);
-                    showMessageBox('Error', 'Failed to load attendance data.');
+                    showMessageBox('Error', `Failed to load attendance data: ${error.message}`);
                 }
             }
 
@@ -1199,7 +1257,8 @@ async function exportData() {
                 noAssignedTasksMessage.classList.add('hidden');
 
                 try {
-                    const tasks = await getAllData('tasks');
+                    const response = await directusFetch('GET', '/items/tasks?limit=-1&fields=*,assigned_to_volunteer_id.full_name');
+                    const tasks = response.data;
                     if (tasks.length === 0) {
                         noAssignedTasksMessage.classList.remove('hidden');
                         return;
@@ -1207,7 +1266,7 @@ async function exportData() {
                     tasks.forEach(task => {
                         const row = taskListBody.insertRow();
                         row.innerHTML = `
-                            <td>${task.assignedToVolunteerName}</td>
+                            <td>${task.assigned_to_volunteer_id?.full_name || 'Unassigned'}</td>
                             <td>${task.project}</td>
                             <td>${task.area}</td>
                             <td>${task.description}</td>
@@ -1219,19 +1278,20 @@ async function exportData() {
                     });
                 } catch (error) {
                     console.error('Error loading tasks:', error);
-                    showMessageBox('Error', 'Failed to load task data.');
+                    showMessageBox('Error', `Failed to load task data: ${error.message}`);
                 }
             }
 
             window.editTask = async function(id) {
                 try {
-                    const task = await getDataById('tasks', id);
+                    const response = await directusFetch('GET', `/items/tasks/${id}`);
+                    const task = response.data;
                     if (!task) {
                         showMessageBox('Error', 'Task not found for editing.');
                         return;
                     }
                     document.getElementById('taskId').value = task.id;
-                    document.getElementById('taskVolunteerSelect').value = task.assignedToVolunteerId;
+                    document.getElementById('taskVolunteerSelect').value = task.assigned_to_volunteer_id;
                     document.getElementById('taskProject').value = task.project;
                     document.getElementById('taskArea').value = task.area;
                     document.getElementById('taskDescription').value = task.description;
@@ -1244,7 +1304,7 @@ async function exportData() {
             window.confirmDeleteTask = function(id) {
                 showMessageBox('Confirm Deletion', 'Are you sure you want to delete this task?', true, async () => {
                     try {
-                        await deleteData('tasks', id);
+                        await directusFetch('DELETE', `/items/tasks/${id}`);
                         showMessageBox('Success', 'Task deleted successfully!');
                         loadTasks();
                         loadVolunteersByArea();
@@ -1259,15 +1319,17 @@ async function exportData() {
                 container.innerHTML = '<p class="text-center text-gray-600">Loading...</p>';
 
                 try {
-                    const allTasks = await getAllData('tasks');
+                    const response = await directusFetch('GET', '/items/tasks?limit=-1&fields=area,assigned_to_volunteer_id.full_name');
+                    const allTasks = response.data;
                     const volunteersByArea = {};
 
                     allTasks.forEach(task => {
+                        if (!task.assigned_to_volunteer_id) return; // Skip if volunteer is not assigned
                         const area = task.area || 'Unassigned Area';
                         if (!volunteersByArea[area]) {
                             volunteersByArea[area] = new Set();
                         }
-                        volunteersByArea[area].add(task.assignedToVolunteerName);
+                        volunteersByArea[area].add(task.assigned_to_volunteer_id.full_name);
                     });
 
                     if (Object.keys(volunteersByArea).length === 0) {
@@ -1301,19 +1363,22 @@ async function exportData() {
                 noRequestsFoundMessage.classList.add('hidden');
 
                 try {
-                    const requests = await getAllData('requests');
+                    const response = await directusFetch('GET', '/items/requests?limit=-1&sort=-request_date&fields=*,volunteer_id.full_name,absent_dates.absent_date');
+                    const requests = response.data;
                     if (requests.length === 0) {
                         noRequestsFoundMessage.classList.remove('hidden');
                         return;
                     }
-                    requests.sort((a, b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime());
+
                     requests.forEach(request => {
-                        const absentDatesDisplay = request.absentDates && request.absentDates.length > 0 ? request.absentDates.map(displayDate).join(', ') : 'N/A';
+                        const absentDatesDisplay = request.absent_dates && request.absent_dates.length > 0
+                            ? request.absent_dates.map(d => displayDate(d.absent_date)).join(', ')
+                            : 'N/A';
                         const row = requestListBody.insertRow();
                         row.innerHTML = `
-                            <td>${request.volunteerName}</td>
-                            <td>${displayDate(request.requestDate)}</td>
-                            <td>${request.requestType}</td>
+                            <td>${request.volunteer_id?.full_name || 'Unknown'}</td>
+                            <td>${displayDate(request.request_date)}</td>
+                            <td>${request.request_type}</td>
                             <td>${request.details}</td>
                             <td>${absentDatesDisplay}</td>
                             <td>
@@ -1328,7 +1393,7 @@ async function exportData() {
                     });
                 } catch (error) {
                     console.error('Error loading requests:', error);
-                    showMessageBox('Error', 'Failed to load request data.');
+                    showMessageBox('Error', `Failed to load request data: ${error.message}`);
                 }
             }
 
@@ -1339,7 +1404,8 @@ async function exportData() {
                 const noTradeSummaryMessage = document.getElementById('noTradeSummary');
 
                 try {
-                    const volunteers = await getAllData('volunteers');
+                    // Re-use the already loaded 'allVolunteers' global array
+                    const volunteers = allVolunteers;
                     const trades = {};
                     const uniqueTrades = new Set();
 
@@ -1373,7 +1439,7 @@ async function exportData() {
                     filterVolunteersByTrade(tradeFilterSelect.value);
                 } catch (error) {
                     console.error('Error loading trade reports:', error);
-                    showMessageBox('Error', 'Failed to load trade report data.');
+                    showMessageBox('Error', `Failed to load trade report data: ${error.message}`);
                 }
             }
 
@@ -1403,8 +1469,8 @@ async function exportData() {
 
             // --- Dropdown Population ---
             async function populateVolunteerDropdowns() {
-                const volunteers = await getAllData('volunteers');
-                volunteers.sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
+                // Re-use the already loaded 'allVolunteers' global array
+                const volunteers = [...allVolunteers].sort((a, b) => (a.fullName || '').localeCompare(b.fullName || ''));
                 
                 const taskSelect = document.getElementById('taskVolunteerSelect');
                 const requestDatalist = document.getElementById('volunteerDatalist');
@@ -1431,13 +1497,14 @@ async function exportData() {
             }
 
             // --- Tab Switching and Data Loading ---
-            function loadAllData() {
-                loadVolunteers();
+            async function loadAllData() {
+                await loadVolunteers(); // This is the main data fetch
+                // The rest can be loaded on tab switch or use the loaded data
+                populateVolunteerDropdowns();
                 loadAttendanceRecords();
                 loadTasks();
                 loadRequests();
-                loadTradeReports();
-                populateVolunteerDropdowns();
+                loadTradeReports(); // Uses allVolunteers
                 loadVolunteersByArea();
             }
 
@@ -1448,12 +1515,12 @@ async function exportData() {
                 document.querySelector(`.tab-button[data-tab="${tabId}"]`).classList.add('active');
                 document.getElementById(tabId).classList.remove('hidden');
 
-                // Refresh data for the selected tab
+                // Refresh data for the selected tab for real-time updates
                 if (tabId === 'volunteers') {
-                    loadVolunteers();
+                    if (document.getElementById('volunteerDetailView').classList.contains('hidden')) {
+                       loadVolunteers();
+                    }
                     document.getElementById('volunteerFormContainer').classList.add('hidden');
-                    document.getElementById('volunteerDetailView').classList.add('hidden');
-                    document.getElementById('volunteerCardView').classList.remove('hidden');
                 } else if (tabId === 'attendance') {
                     loadAttendanceRecords();
                 } else if (tabId === 'tasks') {
@@ -1462,7 +1529,7 @@ async function exportData() {
                 } else if (tabId === 'requests') {
                     loadRequests();
                 } else if (tabId === 'tradeReports') {
-                    loadTradeReports();
+                    loadTradeReports(); // This uses the global volunteer list, so it's fast
                 }
             }
 
@@ -1585,7 +1652,7 @@ async function exportData() {
                 document.getElementById('importMappingModalOverlay').classList.remove('hidden');
                 document.getElementById('importMappingModal').classList.remove('hidden');
             }
-
+            
             async function processImport() {
                 const mapping = {};
                 document.querySelectorAll('#importMappingContainer select').forEach(select => {
@@ -1598,16 +1665,21 @@ async function exportData() {
                     showMessageBox('Error', 'Full Name and Assigned Number must be mapped to import.');
                     return;
                 }
-
+                
                 newVolunteersToImport = [];
                 duplicateVolunteersToProcess = [];
+
+                // Use a Set to track assigned numbers being processed to prevent duplicate API calls
+                const processedAssignedNumbers = new Set();
 
                 for (const row of excelDataToImport) {
                     const assignedNumber = row[mapping.assignedNumber] ? String(row[mapping.assignedNumber]).trim() : null;
                     const fullName = row[mapping.fullName] ? String(row[mapping.fullName]).trim() : '';
-                    if (!assignedNumber || !fullName) continue;
+                    if (!assignedNumber || !fullName || processedAssignedNumbers.has(assignedNumber)) continue;
 
-                    const volunteerData = {
+                    processedAssignedNumbers.add(assignedNumber);
+
+                    const appData = {
                         fullName,
                         assignedNumber,
                         contactNumber: row[mapping.contactNumber] || '',
@@ -1623,16 +1695,18 @@ async function exportData() {
                         spouseContactNumber: row[mapping.spouseContactNumber] || '',
                         weddingAnniversary: row[mapping.weddingAnniversary] ? formatImportedDate(row[mapping.weddingAnniversary]) : '',
                         churchCongregation: row[mapping.churchCongregation] || '',
-                        children: [],
-                        picture: ''
+                        children: [], // Children cannot be imported from a flat Excel file
+                        picture: null
                     };
-
-                    const existing = await getDataByIndex('volunteers', 'assignedNumber', assignedNumber);
-                    if (existing.length > 0) {
-                        volunteerData.id = existing[0].id; // Keep track of existing ID for update
-                        duplicateVolunteersToProcess.push({ new: volunteerData, old: existing[0] });
+                    
+                    // Check existence using the global list to avoid multiple API calls
+                    const existing = allVolunteers.find(v => String(v.assignedNumber) === assignedNumber);
+                    
+                    if (existing) {
+                        appData.id = existing.id; // Keep track of existing ID for update
+                        duplicateVolunteersToProcess.push({ new: appData, old: existing });
                     } else {
-                        newVolunteersToImport.push(volunteerData);
+                        newVolunteersToImport.push(appData);
                     }
                 }
 
@@ -1645,6 +1719,7 @@ async function exportData() {
                     await finalizeImport();
                 }
             }
+
 
             function showDuplicateModal() {
                 const container = document.getElementById('duplicateListContainer');
@@ -1676,34 +1751,50 @@ async function exportData() {
                 let ignoredCount = 0;
                 let newCount = 0;
                 let skippedCount = excelDataToImport.length - (newVolunteersToImport.length + duplicateVolunteersToProcess.length);
+                
+                const volunteersToUpdate = [];
 
                 // Process duplicates based on user choice
                 document.querySelectorAll('#duplicateListContainer > div').forEach((div, index) => {
                     const choice = div.querySelector('input[type="radio"]:checked').value;
                     if (choice === 'update') {
-                        updateData('volunteers', duplicateVolunteersToProcess[index].new);
+                        const volunteerData = duplicateVolunteersToProcess[index].new;
+                        // Prepare for batch update
+                        volunteersToUpdate.push(transformAppToApi(volunteerData, fieldMap));
                         updatedCount++;
                     } else {
                         ignoredCount++;
                     }
                 });
-
-                // Add new volunteers
-                for (const volunteer of newVolunteersToImport) {
-                    await addData('volunteers', volunteer);
-                    newCount++;
-                }
                 
-                let summaryMessage = `${newCount} new volunteers added, ${updatedCount} updated, and ${ignoredCount} ignored.`;
-                if (skippedCount > 0) {
-                    summaryMessage += ` ${skippedCount} rows were skipped due to missing required data.`;
-                }
+                try {
+                    // Batch create new volunteers
+                    if (newVolunteersToImport.length > 0) {
+                         const apiNewVolunteers = newVolunteersToImport.map(v => transformAppToApi(v, fieldMap));
+                         await directusFetch('POST', '/items/volunteers', apiNewVolunteers);
+                         newCount = newVolunteersToImport.length;
+                    }
 
-                showMessageBox('Import Complete', summaryMessage);
-                document.getElementById('duplicateModalOverlay').classList.add('hidden');
-                document.getElementById('duplicateModal').classList.add('hidden');
-                loadAllData();
+                    // Batch update existing volunteers
+                    if (volunteersToUpdate.length > 0) {
+                        await directusFetch('PATCH', '/items/volunteers', volunteersToUpdate);
+                    }
+
+                    let summaryMessage = `${newCount} new volunteers added, ${updatedCount} updated, and ${ignoredCount} ignored.`;
+                    if (skippedCount > 0) {
+                        summaryMessage += ` ${skippedCount} rows were skipped due to missing required data.`;
+                    }
+
+                    showMessageBox('Import Complete', summaryMessage);
+                    loadAllData();
+                } catch (error) {
+                    showMessageBox('Import Error', `An error occurred during the import process: ${error.message}`);
+                } finally {
+                    document.getElementById('duplicateModalOverlay').classList.add('hidden');
+                    document.getElementById('duplicateModal').classList.add('hidden');
+                }
             }
+
 
             // --- Delete All Data Functions ---
             function confirmDeleteAllData() {
@@ -1724,83 +1815,180 @@ async function exportData() {
 
             async function deleteAllData() {
                 try {
-                    const stores = ['volunteers', 'attendance', 'tasks', 'requests'];
-                    const transaction = db.transaction(stores, 'readwrite');
-                    for (const storeName of stores) {
-                        transaction.objectStore(storeName).clear();
+                    // Order of deletion matters to respect foreign key constraints
+                    const collections = ['request_absent_dates', 'volunteer_children', 'attendance', 'tasks', 'requests', 'volunteers'];
+                    
+                    for (const collection of collections) {
+                        // Fetch all item IDs from the collection
+                        const response = await directusFetch('GET', `/items/${collection}?limit=-1&fields=id`);
+                        const itemIds = response.data.map(item => item.id);
+                        
+                        // If there are items, send a batch delete request
+                        if (itemIds.length > 0) {
+                            await directusFetch('DELETE', `/items/${collection}`, itemIds);
+                        }
                     }
-                    transaction.oncomplete = () => {
-                        showMessageBox('Success', 'All data has been successfully deleted.');
-                        loadAllData();
-                    };
-                    transaction.onerror = (e) => {
-                         showMessageBox('Error', 'Failed to delete all data: ' + e.target.error);
-                    };
+                    showMessageBox('Success', 'All data has been successfully deleted.');
+                    loadAllData();
                 } catch (error) {
-                    showMessageBox('Error', 'An error occurred while trying to delete data.');
+                    showMessageBox('Error', 'An error occurred while trying to delete data: ' + error.message);
+                } finally {
+                    document.getElementById('finalDeleteModalOverlay').classList.add('hidden');
+                    document.getElementById('finalDeleteModal').classList.add('hidden');
                 }
-                document.getElementById('finalDeleteModalOverlay').classList.add('hidden');
-                document.getElementById('finalDeleteModal').classList.add('hidden');
             }
- document.getElementById('importDataBtn').addEventListener('click', () => {
-    document.getElementById('importDataInput').click();
-  });
 
-  document.getElementById('importDataInput').addEventListener('change', function (event) {
-    const file = event.target.files[0];
-    if (!file) return;
+            // --- JSON Import/Export (unchanged logic, but uses API) ---
+            document.getElementById('importDataBtn').addEventListener('click', () => {
+                document.getElementById('importDataInput').click();
+            });
 
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      try {
-        const jsonData = JSON.parse(e.target.result);
+            document.getElementById('importDataInput').addEventListener('change', function (event) {
+                const file = event.target.files[0];
+                if (!file) return;
 
-        let volunteers = [];
+                const reader = new FileReader();
+                reader.onload = async function (e) {
+                    try {
+                        const jsonData = JSON.parse(e.target.result);
+                        let volunteers = [];
+                        
+                        // This function expects the exported format which is an array under the 'data' key
+                        if (Array.isArray(jsonData.data)) {
+                            volunteers = jsonData.data;
+                        } else if (Array.isArray(jsonData)) {
+                            volunteers = jsonData;
+                        } else {
+                            throw new Error("Invalid format: Must be an array or an object with a 'data' key containing an array.");
+                        }
+                        
+                        if (volunteers.length === 0) {
+                            showMessageBox('Error', "No volunteers found in the JSON file.");
+                            return;
+                        }
 
-        if (Array.isArray(jsonData)) {
-          // Case 1: JSON is just an array of volunteers (like your export format)
-          volunteers = jsonData;
-        } else if (jsonData.volunteers) {
-          // Case 2: JSON has a 'volunteers' key (in case you support extended import in future)
-          volunteers = jsonData.volunteers;
-        } else {
-          throw new Error("Invalid format: Must be an array or contain 'volunteers' key.");
-        }
+                        // Show progress message
+                        showMessageBox('Import Progress', `Starting import of ${volunteers.length} volunteers...`);
+                        
+                        // Batch process the import
+                        await importVolunteersInBatches(volunteers);
+                        
+                    } catch (err) {
+                        console.error("Import error:", err);
+                        showMessageBox('Error', "Failed to import data. Make sure the file is a valid JSON from a previous export. Error: " + err.message);
+                    }
+                };
 
-        const transaction = db.transaction(['volunteers'], 'readwrite');
-        const volunteerStore = transaction.objectStore('volunteers');
+                reader.readAsText(file);
+                event.target.value = ''; // Reset file input
+            });
 
-        volunteers.forEach(volunteer => {
-          volunteerStore.put(volunteer);
-        });
+            async function importVolunteersInBatches(volunteers) {
+                const BATCH_SIZE = 10; // Reduced batch size to avoid "request entity too large"
+                let totalProcessed = 0;
+                let totalErrors = 0;
+                const errors = [];
 
-        transaction.oncomplete = () => {
-          alert("Volunteer data successfully imported.");
-        };
-
-        transaction.onerror = (event) => {
-          console.error("Transaction error:", event.target.error);
-          alert("Error importing data.");
-        };
-      } catch (err) {
-        console.error("Import error:", err);
-        alert("Failed to import data. Make sure the file is a valid JSON.");
-      }
-    };
-
-    reader.readAsText(file);
-  });
+                try {
+                    // Process volunteers in batches
+                    for (let i = 0; i < volunteers.length; i += BATCH_SIZE) {
+                        const batch = volunteers.slice(i, i + BATCH_SIZE);
+                        
+                        try {
+                            console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(volunteers.length / BATCH_SIZE)}`);
+                            
+                            // Separate main volunteer data from children
+                            const volunteersToCreate = [];
+                            const childrenToCreate = [];
+                            
+                            for (const volunteer of batch) {
+                                // Prepare main volunteer data (without children)
+                                const mainVolunteerData = { ...volunteer };
+                                const volunteerChildren = mainVolunteerData.children || [];
+                                delete mainVolunteerData.children; // Remove children from main data
+                                delete mainVolunteerData.id; // Remove ID to let Directus generate new ones
+                                
+                                // Remove picture reference to avoid foreign key errors
+                                // Pictures from exports won't exist in the new instance
+                                delete mainVolunteerData.picture;
+                                
+                                volunteersToCreate.push(mainVolunteerData);
+                                
+                                // We'll handle children after volunteers are created
+                                if (volunteerChildren.length > 0) {
+                                    childrenToCreate.push({
+                                        originalIndex: volunteersToCreate.length - 1,
+                                        children: volunteerChildren
+                                    });
+                                }
+                            }
+                            
+                            // Create volunteers first
+                            const createResponse = await directusFetch('POST', '/items/volunteers', volunteersToCreate);
+                            const createdVolunteers = createResponse.data;
+                            
+                            // Now create children for the volunteers that have them
+                            if (childrenToCreate.length > 0) {
+                                const allChildrenData = [];
+                                
+                                childrenToCreate.forEach(item => {
+                                    const volunteerId = createdVolunteers[item.originalIndex].id;
+                                    item.children.forEach(child => {
+                                        allChildrenData.push({
+                                            volunteer_id: volunteerId,
+                                            name: child.name,
+                                            birth_date: child.birth_date || child.birthDate // Handle both formats
+                                        });
+                                    });
+                                });
+                                
+                                if (allChildrenData.length > 0) {
+                                    await directusFetch('POST', '/items/volunteer_children', allChildrenData);
+                                }
+                            }
+                            
+                            totalProcessed += batch.length;
+                            console.log(`Successfully processed batch. Total processed: ${totalProcessed}/${volunteers.length}`);
+                            
+                        } catch (batchError) {
+                            console.error(`Error processing batch starting at index ${i}:`, batchError);
+                            totalErrors += batch.length;
+                            errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batchError.message}`);
+                            
+                            // Continue with next batch instead of stopping
+                            continue;
+                        }
+                        
+                        // Longer delay between batches to reduce server load
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                    
+                    // Show final results
+                    let message = `Import completed. ${totalProcessed} volunteers processed successfully.`;
+                    if (totalErrors > 0) {
+                        message += ` ${totalErrors} volunteers failed to import.`;
+                        console.error('Import errors:', errors);
+                    }
+                    
+                    // Add note about pictures not being imported
+                    if (totalProcessed > 0) {
+                        message += ' Note: Volunteer pictures were not imported and will need to be uploaded manually.';
+                    }
+                    
+                    showMessageBox('Import Complete', message);
+                    loadAllData(); // Refresh all data
+                    
+                } catch (error) {
+                    console.error('Critical import error:', error);
+                    showMessageBox('Import Error', 'A critical error occurred during import: ' + error.message);
+                }
+            }
+            
             // --- Application Initialization ---
             document.addEventListener('DOMContentLoaded', async () => {
-                try {
-                    await openDB();
-                } catch (error) {
-                    showMessageBox('Critical Error', 'The application database could not be opened. Please try refreshing the page or clearing your browser cache. The application may not function correctly.');
-                    return; // Stop execution if DB fails
-                }
+                // No DB to open, just attach listeners
                 
                 document.getElementById('exportDataBtn').addEventListener('click', exportData);
-
 
                 // Get all DOM elements once
                 const volunteerForm = document.getElementById('volunteerForm');
@@ -1883,7 +2071,7 @@ async function exportData() {
                 editVolunteerBtn.addEventListener('click', () => editVolunteer(currentDetailVolunteerId));
                 deleteVolunteerBtn.addEventListener('click', () => confirmDeleteVolunteer(currentDetailVolunteerId));
                 viewHistoryBtn.addEventListener('click', async () => {
-                     const volunteer = await getDataById('volunteers', currentDetailVolunteerId);
+                     const volunteer = allVolunteers.find(v => v.id === currentDetailVolunteerId);
                      window.viewVolunteerProjectHistory(currentDetailVolunteerId, volunteer.fullName);
                 });
 
@@ -1899,16 +2087,20 @@ async function exportData() {
                 });
                 
                 // Volunteer Form
+                // Volunteer Form
                 volunteerForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     const volunteerId = document.getElementById('volunteerId').value;
+                    const picturePreview = document.getElementById('picturePreview');
                     
-                    const children = Array.from(childrenInfoContainer.querySelectorAll('.child-entry')).map(row => ({
+                    // 1. Gather children data from the form separately.
+                    const childrenFromForm = Array.from(childrenInfoContainer.querySelectorAll('.child-entry')).map(row => ({
                         name: row.querySelector('.child-name').value.trim(),
                         birthDate: row.querySelector('.child-birth-date').value
-                    })).filter(child => child.name);
+                    })).filter(child => child.name); // Only include children with a name.
 
-                    const volunteer = {
+                    // 2. Gather main volunteer data, WITHOUT the children array.
+                    const appVolunteer = {
                         fullName: document.getElementById('fullName').value.trim(),
                         assignedNumber: document.getElementById('assignedNumber').value.trim(),
                         contactNumber: document.getElementById('contactNumber').value.trim(),
@@ -1924,29 +2116,68 @@ async function exportData() {
                         spouseContactNumber: document.getElementById('spouseContactNumber').value.trim(),
                         weddingAnniversary: document.getElementById('weddingAnniversary').value,
                         churchCongregation: document.getElementById('churchCongregation').value.trim(),
-                        children: children,
-                        picture: document.getElementById('picturePreview').src.startsWith('data:image') ? document.getElementById('picturePreview').src : ''
+                        // NOTE: The 'children' key is intentionally omitted here.
                     };
 
                     try {
-                        if (volunteerId) {
-                            volunteer.id = parseInt(volunteerId);
-                            await updateData('volunteers', volunteer);
-                            showMessageBox('Success', 'Volunteer updated successfully!');
-                        } else {
-                            await addData('volunteers', volunteer);
-                            showMessageBox('Success', 'Volunteer added successfully!');
+                         // Handle picture upload/update first
+                         if (picturePreview.dataset.newFile === 'true' && window.newPictureFile) {
+                            const uploadedFile = await uploadFile(window.newPictureFile);
+                            appVolunteer.picture = uploadedFile.id; // Link the new file ID
+                         } else if (volunteerId) {
+                            appVolunteer.picture = picturePreview.dataset.existingPictureId || null;
+                         } else {
+                            appVolunteer.picture = null;
+                         }
+
+                         // Convert main app data to API format (snake_case)
+                         const apiVolunteerPayload = transformAppToApi(appVolunteer, fieldMap);
+
+                        let savedVolunteerId;
+
+                        if (volunteerId) { // --- This is an UPDATE ---
+                            // 3a. PATCH the main volunteer data first.
+                            await directusFetch('PATCH', `/items/volunteers/${volunteerId}`, apiVolunteerPayload);
+                            savedVolunteerId = parseInt(volunteerId);
+
+                            // 4a. Explicitly DELETE the old children records.
+                            const existingVolunteer = allVolunteers.find(v => v.id === savedVolunteerId);
+                            if (existingVolunteer && existingVolunteer.children && existingVolunteer.children.length > 0) {
+                                const childIdsToDelete = existingVolunteer.children.map(c => c.id);
+                                if (childIdsToDelete.length > 0) {
+                                    await directusFetch('DELETE', '/items/volunteer_children', childIdsToDelete);
+                                }
+                            }
+                        } else { // --- This is a CREATE ---
+                            // 3b. POST the main volunteer data to get the new ID.
+                            const createResponse = await directusFetch('POST', '/items/volunteers', apiVolunteerPayload);
+                            savedVolunteerId = createResponse.data.id;
                         }
+
+                        // 5. For both UPDATE and CREATE, now create the new children records directly.
+                        if (childrenFromForm.length > 0) {
+                            const childrenPayload = childrenFromForm.map(child => ({
+                                volunteer_id: savedVolunteerId, // Link to the parent
+                                name: child.name,
+                                birth_date: child.birthDate || null
+                            }));
+                            // Batch-create all children in a single API call.
+                            await directusFetch('POST', '/items/volunteer_children', childrenPayload);
+                        }
+
+                        showMessageBox('Success', `Volunteer ${volunteerId ? 'updated' : 'added'} successfully!`);
                         clearVolunteerForm(true);
-                        loadAllData();
+                        loadAllData(); // Refresh everything
+
                     } catch (error) {
-                        if (error.name === 'ConstraintError') {
-                            showMessageBox('Error', 'A volunteer with this Assigned Number already exists.');
-                        } else {
-                            showMessageBox('Error', `Failed to save volunteer: ${error.message}`);
-                        }
+                        showMessageBox('Error', `Failed to save volunteer: ${error.message}`);
+                    } finally {
+                        // Clear the temporary file object
+                        window.newPictureFile = null;
+                        picturePreview.dataset.newFile = 'false';
                     }
                 });
+
 
                 birthDateInput.addEventListener('change', (e) => {
                     const age = calculateAge(e.target.value);
@@ -1975,8 +2206,11 @@ async function exportData() {
                 pictureUploadInput.addEventListener('change', e => handleFiles(e.target.files));
                 document.addEventListener('paste', e => handleFiles(e.clipboardData.files));
                 clearPictureBtn.addEventListener('click', () => {
-                    document.getElementById('picturePreview').style.display = 'none';
-                    document.getElementById('picturePreview').src = '#';
+                    const picturePreview = document.getElementById('picturePreview');
+                    picturePreview.style.display = 'none';
+                    picturePreview.src = '#';
+                    picturePreview.dataset.newFile = 'true'; // Mark as changed to clear it
+                    window.newPictureFile = null; // Ensure file object is cleared
                     pictureUploadInput.value = '';
                 });
                 
@@ -1993,30 +2227,40 @@ async function exportData() {
 
                     let successCount = 0;
                     const today = new Date().toISOString().split('T')[0];
+                    const recordsToCreate = [];
 
                     for (const entry of entries) {
                         const assignedNumber = entry.querySelector('.absent-assigned-number').value.trim();
                         const reason = entry.querySelector('.absence-reason').value.trim();
                         if (!assignedNumber || !reason) continue;
+                        
+                        // Find volunteer from global list
+                        const volunteer = allVolunteers.find(v => String(v.assignedNumber) === assignedNumber);
 
-                        const volunteers = await getDataByIndex('volunteers', 'assignedNumber', assignedNumber);
-                        if (volunteers.length > 0) {
-                            const volunteer = volunteers[0];
-                            const existing = await getDataByIndex('attendance', 'volunteerIdAndDate', [volunteer.id, today]);
-                            const record = { volunteerId: volunteer.id, volunteerName: volunteer.fullName, date: today, status: 'Absent', reason };
-                            if (existing.length > 0) {
-                                record.id = existing[0].id;
-                                await updateData('attendance', record);
-                            } else {
-                                await addData('attendance', record);
-                            }
+                        if (volunteer) {
+                            recordsToCreate.push({
+                                volunteer_id: volunteer.id,
+                                date: today,
+                                status: 'Absent',
+                                reason: reason
+                            });
                             successCount++;
                         }
                     }
-                    showMessageBox('Success', `${successCount} absentee(s) recorded.`);
-                    absenteeInputContainer.innerHTML = '';
-                    addAbsenteeInputRow();
-                    loadAttendanceRecords();
+
+                    if (recordsToCreate.length > 0) {
+                        try {
+                           await directusFetch('POST', '/items/attendance', recordsToCreate);
+                           showMessageBox('Success', `${successCount} absentee(s) recorded.`);
+                           absenteeInputContainer.innerHTML = '';
+                           addAbsenteeInputRow();
+                           loadAttendanceRecords();
+                        } catch(error) {
+                           showMessageBox('Error', `Failed to record absences: ${error.message}`);
+                        }
+                    } else if (entries.length > 0) {
+                        showMessageBox('Warning', 'No valid volunteer assigned numbers found for the entries provided.');
+                    }
                 });
 
                 // Task Tab
@@ -2025,19 +2269,17 @@ async function exportData() {
                     const taskId = document.getElementById('taskId').value;
                     const volunteerSelect = document.getElementById('taskVolunteerSelect');
                     const task = {
-                        assignedToVolunteerId: parseInt(volunteerSelect.value),
-                        assignedToVolunteerName: volunteerSelect.options[volunteerSelect.selectedIndex].text,
+                        assigned_to_volunteer_id: parseInt(volunteerSelect.value),
                         project: document.getElementById('taskProject').value,
                         area: document.getElementById('taskArea').value,
                         description: document.getElementById('taskDescription').value
                     };
                     try {
                         if (taskId) {
-                            task.id = parseInt(taskId);
-                            await updateData('tasks', task);
+                            await directusFetch('PATCH', `/items/tasks/${taskId}`, task);
                             showMessageBox('Success', 'Task updated successfully!');
                         } else {
-                            await addData('tasks', task);
+                            await directusFetch('POST', '/items/tasks', task);
                             showMessageBox('Success', 'Task added successfully!');
                         }
                         taskForm.reset();
@@ -2074,41 +2316,68 @@ async function exportData() {
                         return;
                     }
                     const volunteerId = parseInt(option.dataset.id);
-                    const volunteerName = identifier.split(' (No:')[0];
                     const absentDates = Array.from(document.querySelectorAll('.absent-date-input')).map(i => i.value).filter(Boolean);
-
+                    
                     const newRequest = {
-                        volunteerId, volunteerName,
-                        requestDate: new Date().toISOString().split('T')[0],
-                        requestType: requestTypeSelect.value,
+                        volunteer_id: volunteerId,
+                        request_date: new Date().toISOString().split('T')[0],
+                        request_type: requestTypeSelect.value,
                         details: document.getElementById('requestDetails').value,
-                        absentDates,
-                        status: 'Pending'
+                        status: 'Pending',
+                        // Format for deep insert of relational dates
+                        absent_dates: absentDates.map(date => ({ absent_date: date }))
                     };
-                    await addData('requests', newRequest);
-                    showMessageBox('Success', 'Request submitted!');
-                    requestForm.reset();
-                    loadRequests();
+
+                    try {
+                        await directusFetch('POST', '/items/requests', newRequest);
+                        showMessageBox('Success', 'Request submitted!');
+                        requestForm.reset();
+                        document.getElementById('absenceDatesSection').classList.add('hidden');
+                        document.getElementById('absentDatesContainer').innerHTML = '';
+                        loadRequests();
+                    } catch (error) {
+                        showMessageBox('Error', `Failed to submit request: ${error.message}`);
+                    }
                 });
                 requestTypeSelect.addEventListener('change', (e) => {
-                    document.getElementById('absenceDatesSection').classList.toggle('hidden', e.target.value !== 'Leave Request');
+                    const isLeave = e.target.value === 'Leave Request';
+                    document.getElementById('absenceDatesSection').classList.toggle('hidden', !isLeave);
+                     if (isLeave && document.getElementById('absentDatesContainer').children.length === 0) {
+                        addAbsentDateInput();
+                    }
                 });
-                addAbsentDateBtn.addEventListener('click', () => addAbsentDateInput());
+                function addAbsentDateInput() {
+                    const container = document.getElementById('absentDatesContainer');
+                    const newRow = document.createElement('div');
+                    newRow.className = 'flex items-center space-x-2 absent-date-entry';
+                    newRow.innerHTML = `
+                         <input type="date" class="absent-date-input flex-grow p-2 border rounded-md">
+                         <button type="button" class="remove-absent-date-row text-red-500 hover:text-red-700 font-bold">&times;</button>
+                    `;
+                    container.appendChild(newRow);
+                }
+                addAbsentDateBtn.addEventListener('click', addAbsentDateInput);
                 document.getElementById('absentDatesContainer').addEventListener('click', (e) => {
                     if (e.target.classList.contains('remove-absent-date-row')) {
                         e.target.closest('.absent-date-entry').remove();
                     }
                 });
-                clearRequestFormBtn.addEventListener('click', () => requestForm.reset());
+                clearRequestFormBtn.addEventListener('click', () => {
+                    requestForm.reset();
+                    document.getElementById('absenceDatesSection').classList.add('hidden');
+                    document.getElementById('absentDatesContainer').innerHTML = '';
+                });
                 requestListBody.addEventListener('change', async (e) => {
                     if (e.target.classList.contains('request-status-select')) {
                         const requestId = parseInt(e.target.dataset.id);
                         const newStatus = e.target.value;
-                        const request = await getDataById('requests', requestId);
-                        if (request) {
-                            request.status = newStatus;
-                            await updateData('requests', request);
-                            showMessageBox('Success', 'Request status updated.');
+                        try {
+                            await directusFetch('PATCH', `/items/requests/${requestId}`, { status: newStatus });
+                             showMessageBox('Success', 'Request status updated.');
+                        } catch (error) {
+                            showMessageBox('Error', 'Failed to update status.');
+                            // Revert UI on failure
+                            loadRequests();
                         }
                     }
                 });
@@ -2116,9 +2385,20 @@ async function exportData() {
                     if (e.target.classList.contains('request-delete-btn')) {
                          const requestId = parseInt(e.target.dataset.id);
                          showMessageBox('Confirm Deletion', 'Are you sure you want to delete this request?', true, async () => {
-                             await deleteData('requests', requestId);
-                             showMessageBox('Success', 'Request deleted.');
-                             loadRequests();
+                            try {
+                                 // First delete related absent dates
+                                 const absentDatesRes = await directusFetch('GET', `/items/request_absent_dates?filter[request_id][_eq]=${requestId}&fields=id`);
+                                 if(absentDatesRes.data.length > 0) {
+                                    const dateIds = absentDatesRes.data.map(d => d.id);
+                                    await directusFetch('DELETE', '/items/request_absent_dates', dateIds);
+                                 }
+                                 // Then delete the request itself
+                                 await directusFetch('DELETE', `/items/requests/${requestId}`);
+                                 showMessageBox('Success', 'Request deleted.');
+                                 loadRequests();
+                            } catch (error) {
+                                showMessageBox('Error', `Failed to delete request: ${error.message}`);
+                            }
                          });
                     }
                 });
@@ -2159,8 +2439,12 @@ async function exportData() {
 
 
                 // Initial Load
-                loadAllData();
-                switchTab('volunteers');
+                try {
+                    await loadAllData();
+                    switchTab('volunteers');
+                } catch (error) {
+                     showMessageBox('Connection Error', 'Could not connect to the backend server. Please check the connection and refresh the page. ' + error.message);
+                }
             });
         })();
     </script>
