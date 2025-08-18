@@ -1,15 +1,13 @@
-# Use official Nginx image
-FROM nginx:alpine
+# Use official Node.js image
+FROM node:18-alpine
 
-# Remove default nginx static files
-RUN rm -rf /usr/share/nginx/html/*
+WORKDIR /app
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY package*.json ./
+RUN npm install
 
-# Copy your static files into nginx's html directory
-COPY . /usr/share/nginx/html
+COPY . .
 
-EXPOSE 80
+EXPOSE 3004
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["npm", "start"]

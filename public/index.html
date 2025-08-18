@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WCM - Multi-User</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            background-color: #f9fafb; /* Lighter gray */
+        }
+        .sidebar {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .main-content {
+            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .tab-link {
+            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+        }
+        .tab-link.active-tab, .tab-link:hover {
+            background-color: #f3f4f6; /* gray-100 */
+            color: #111827; /* gray-900 */
+        }
+        .tab-link.active-tab {
+            font-weight: 600;
+        }
+        .card {
+            background-color: white;
+            border-radius: 1rem; /* More rounded */
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.07);
+        }
+        .btn {
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+        }
+        .btn-primary {
+            background-color: #007aff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0071e3;
+        }
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #1f2937;
+        }
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
+        .form-input {
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .form-input:focus {
+            border-color: #007aff;
+            box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+            outline: none;
+        }
+        .modal-content {
+            animation: modal-fade-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes modal-fade-in {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                z-index: 40;
+                height: 100%;
+            }
+            .sidebar.show {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="relative min-h-screen md:flex">
+        <div class="md:hidden flex justify-between bg-white/80 backdrop-blur-sm border-b border-gray-200 text-gray-800 p-4 sticky top-0 z-30">
+            <div class="text-xl font-bold flex items-center"><i class="fas fa-hard-hat mr-2 text-blue-500"></i>WCM</div>
+            <button id="mobile-menu-button" class="focus:outline-none">
+                <i class="fas fa-bars text-xl"></i>
+            </button>
+        </div>
+
+        <aside id="sidebar" class="sidebar w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+            <div class="p-6 text-xl font-bold border-b border-gray-200 hidden md:flex items-center">
+                <i class="fas fa-hard-hat mr-2 text-blue-500"></i>WCM
+            </div>
+            <nav class="flex-1 p-4">
+                <ul>
+                    <li class="mb-2"><a href="#" class="tab-link active-tab flex items-center p-3 rounded-lg text-gray-600" data-tab="dashboard"><i class="fas fa-tachometer-alt w-6 h-6 mr-3 text-gray-400"></i><span>Dashboard</span></a></li>
+                    <li class="mb-2"><a href="#" class="tab-link flex items-center p-3 rounded-lg text-gray-600" data-tab="registration"><i class="fas fa-database w-6 h-6 mr-3 text-gray-400"></i><span>WC Database</span></a></li>
+                    <li class="mb-2"><a href="#" class="tab-link flex items-center p-3 rounded-lg text-gray-600" data-tab="assignment"><i class="fas fa-tasks w-6 h-6 mr-3 text-gray-400"></i><span>Assignment</span></a></li>
+                    <li class="mb-2"><a href="#" class="tab-link flex items-center p-3 rounded-lg text-gray-600" data-tab="projects"><i class="fas fa-building w-6 h-6 mr-3 text-gray-400"></i><span>Projects</span></a></li>
+                    <li class="mb-2"><a href="#" class="tab-link flex items-center p-3 rounded-lg text-gray-600" data-tab="finance"><i class="fas fa-coins w-6 h-6 mr-3 text-gray-400"></i><span>Finance</span></a></li>
+                    <li><a href="#" class="tab-link flex items-center p-3 rounded-lg text-gray-600" data-tab="requests"><i class="fas fa-calendar-check w-6 h-6 mr-3 text-gray-400"></i><span>Requests</span></a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content flex-1 p-4 sm:p-8 overflow-y-auto">
+            <div id="dashboard" class="tab-content">
+                <h1 class="text-4xl font-bold text-gray-900 mb-8">Dashboard</h1>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 space-y-8">
+                        <div class="card p-6">
+                            <h2 class="text-xl font-semibold text-gray-900 mb-4">Workforce Distribution by Trade</h2>
+                            <div class="h-80">
+                                <canvas id="workforce-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="card p-6">
+                            <h2 class="text-xl font-semibold text-gray-900 mb-4">Workforce Distribution by Area</h2>
+                            <div class="h-80">
+                                <canvas id="area-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-1 space-y-8">
+                        <div class="card p-6 flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 font-medium">Present Workers</p>
+                                <p id="present-workers-count" class="text-4xl font-bold text-gray-900">0</p>
+                            </div>
+                            <i class="fas fa-users text-4xl text-blue-500 opacity-70"></i>
+                        </div>
+                        <div class="card p-6">
+                            <h2 class="text-xl font-semibold text-gray-900 mb-4">Notifications</h2>
+                            <div id="notifications-list" class="space-y-4"></div>
+                        </div>
+                        <div class="card">
+                            <h2 class="text-xl font-semibold text-gray-900 p-6">Absentees Today</h2>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left">
+                                    <tbody id="dashboard-absentees-table" class="divide-y divide-gray-200"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="registration" class="tab-content hidden">
+                <h1 class="text-4xl font-bold text-gray-900 mb-8">Worker Database</h1>
+                
+                <div id="registration-form-container" class="card p-6 sm:p-8 mb-8 hidden">
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-6">New Worker Registration</h2>
+                    <form id="registration-form" class="space-y-6">
+                        <input type="hidden" name="Photo" id="photo-data-input">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div class="lg:col-span-1"><label class="block text-gray-700 font-medium mb-2">Photo</label><div id="photo-drop-zone" class="photo-drop-zone"><div id="photo-preview-container"><i class="fas fa-cloud-upload-alt text-4xl text-gray-400"></i><p class="text-gray-500 mt-2">Drag, paste, or click</p></div></div><input type="file" id="photo-file-input" class="hidden" accept="image/*"></div>
+                            <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div class="sm:col-span-2"><div><label class="block text-gray-700 font-medium">Full Name</label><input type="text" name="FullName" class="form-input w-full p-3 mt-1"></div></div>
+                                <div><label class="block text-gray-700 font-medium">Assigned Number</label><input type="text" name="AssignedNumber" class="form-input w-full p-3 mt-1"></div>
+                                <div><label class="block text-gray-700 font-medium">Trade</label><select name="Trade" class="form-input w-full p-3 mt-1"><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Mason</option><option>Welder</option><option>General Laborer</option></select></div>
+                                <div><label class="block text-gray-700 font-medium">Contact Number</label><input type="tel" name="ContactNumber" class="form-input w-full p-3 mt-1"></div>
+                                <div><label class="block text-gray-700 font-medium">Birthday</label><input type="date" name="Birthday" id="birthday-input" class="form-input w-full p-3 mt-1"></div>
+                                <div><label class="block text-gray-700 font-medium">Wedding Anniversary</label><input type="date" name="WeddingAnniversary" class="form-input w-full p-3 mt-1"></div>
+                                <div><label class="block text-gray-700 font-medium">Age</label><input type="text" id="age-output" class="form-input w-full p-3 mt-1 bg-gray-100" readonly></div>
+                                <div class="sm:col-span-2"><label class="block text-gray-700 font-medium">Address</label><textarea name="Address" class="form-input w-full p-3 mt-1" rows="2"></textarea></div>
+                                <div><label class="block text-gray-700 font-medium">Marital Status</label><select name="MaritalStatus" class="form-input w-full p-3 mt-1"><option>Single</option><option>Married</option><option>Widowed</option><option>Divorced</option></select></div>
+                                <div><label class="block text-gray-700 font-medium">Local Congregation</label><input type="text" name="LocalCongregation" class="form-input w-full p-3 mt-1"></div>
+                                <div class="sm:col-span-2"><label class="block text-gray-700 font-medium">Medical Condition (if any)</label><textarea name="MedicalCondition" class="form-input w-full p-3 mt-1" rows="2"></textarea></div>
+                                <div><label class="block text-gray-700 font-medium">Emergency Contact Person</label><input type="text" name="EmergencyContactPerson" class="form-input w-full p-3 mt-1"></div>
+                                <div><label class="block text-gray-700 font-medium">Emergency Contact Number</label><input type="tel" name="EmergencyContactNumber" class="form-input w-full p-3 mt-1"></div>
+                            </div>
+                        </div>
+                        <div class="mt-8 flex justify-end space-x-4">
+                            <button type="button" id="cancel-registration-btn" class="btn btn-secondary px-6 py-3">Cancel</button>
+                            <button type="submit" class="btn btn-primary px-8 py-3">Register Worker</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="mb-8">
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-4">Trade Summary</h2>
+                    <div id="trade-tally-container" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                        </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
+                        <h2 class="text-2xl font-semibold text-gray-900">Registered Workers</h2>
+                        <div class="flex items-center gap-2 sm:gap-4 flex-wrap justify-end">
+                            <div class="w-full sm:w-auto max-w-xs"><div class="relative"><div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-search text-gray-400"></i></div><input type="search" id="search-bar" placeholder="Search..." class="form-input block w-full pl-10 pr-3 py-2"></div></div>
+                            <button id="import-excel-btn" class="btn btn-secondary px-4 py-2 text-sm"><i class="fas fa-file-excel sm:mr-2"></i><span class="hidden sm:inline">Import Excel</span></button>
+                            <button id="add-worker-btn" class="btn btn-primary px-4 py-2 text-sm"><i class="fas fa-plus sm:mr-2"></i><span class="hidden sm:inline">Add Worker</span></button>
+                        </div>
+                    </div>
+                    <div id="volunteer-tiles-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6"></div>
+                    <div id="pagination-controls" class="mt-8 flex justify-center items-center space-x-2 sm:space-x-4"></div>
+                </div>
+            </div>
+            
+            <div id="assignment" class="tab-content hidden">
+                <h1 class="text-4xl font-bold text-gray-900 mb-8">Assignment</h1>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="lg:col-span-1 card p-6">
+                        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Assign Workers</h2>
+                        <form id="assignment-form" class="space-y-4">
+                            <div class="relative">
+                                <label for="assignment-worker-search" class="block text-sm font-medium text-gray-700">Add Workers (up to 10)</label>
+                                <input type="text" id="assignment-worker-search" placeholder="Search for an unassigned worker..." class="form-input w-full p-3 mt-1" autocomplete="off">
+                                <div id="assignment-worker-suggestions" class="absolute z-10 w-full bg-white border rounded-lg mt-1 max-h-48 overflow-y-auto hidden shadow-lg"></div>
+                            </div>
+                            <div id="assignment-list-container" class="space-y-2 max-h-48 overflow-y-auto"></div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="assignment-project-select" class="block text-sm font-medium text-gray-700">Project</label>
+                                    <select id="assignment-project-select" class="form-input w-full p-3 mt-1"></select>
+                                </div>
+                                <div>
+                                    <label for="assignment-area-select" class="block text-sm font-medium text-gray-700">Area</label>
+                                    <select id="assignment-area-select" class="form-input w-full p-3 mt-1" disabled>
+                                        <option value="">Select a project first</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" id="confirm-assignment-btn" class="btn btn-primary w-full py-3" disabled>Assign Workers</button>
+                        </form>
+                    </div>
+
+                    <div class="lg:col-span-1 card p-6">
+                        <h2 class="text-2xl font-semibold text-gray-900 mb-6">Mark Absent</h2>
+                        <form id="absence-form" class="space-y-4">
+                            <div class="relative">
+                                <label for="absence-worker-search" class="block text-sm font-medium text-gray-700">Add Workers (up to 10)</label>
+                                <input type="text" id="absence-worker-search" placeholder="Search for a present worker..." class="form-input w-full p-3 mt-1" autocomplete="off">
+                                <div id="absence-worker-suggestions" class="absolute z-10 w-full bg-white border rounded-lg mt-1 max-h-48 overflow-y-auto hidden shadow-lg"></div>
+                            </div>
+                            <div id="absence-list-container" class="space-y-3 max-h-64 overflow-y-auto p-1"></div>
+                            <button type="submit" id="confirm-absence-btn" class="btn btn-primary w-full py-3" disabled>Mark Absent</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <h2 class="text-2xl font-semibold text-gray-900 mb-4">Projects Overview</h2>
+                    <div id="assignment-projects-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+                </div>
+
+                <div class="mt-8 card">
+                    <h2 class="text-2xl font-semibold text-gray-900 p-6">Current Assignments</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="p-4 text-left font-semibold">Worker</th>
+                                    <th class="p-4 text-left font-semibold">Project</th>
+                                    <th class="p-4 text-left font-semibold">Area</th>
+                                    <th class="p-4 text-left font-semibold">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assignments-table" class="divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="projects" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-8 flex-wrap gap-4">
+                    <h1 class="text-4xl font-bold text-gray-900">Projects</h1>
+                    <button id="create-project-btn" class="btn btn-primary px-5 py-2"><i class="fas fa-plus mr-2"></i>Create Project</button>
+                </div>
+                <div id="projects-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+            </div>
+
+            <div id="finance" class="tab-content hidden">
+                <h1 class="text-4xl font-bold text-gray-900 mb-8">Finance</h1>
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                    <div class="xl:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <section><h2 class="text-2xl font-semibold text-gray-700 mb-4 pb-2 border-b">Fund Received</h2><form id="fund-received-form" class="card p-6 mb-6 space-y-4"><div><label for="received-date" class="block text-sm font-medium text-gray-700">Date</label><input type="date" id="received-date" class="form-input mt-1 block w-full p-2" required></div><div><label for="received-project" class="block text-sm font-medium text-gray-700">For Project</label><select id="received-project" class="form-input mt-1 block w-full p-2" required></select></div><div><label for="received-amount" class="block text-sm font-medium text-gray-700">Amount</label><input type="number" id="received-amount" placeholder="0.00" class="form-input mt-1 block w-full p-2" required min="0.01" step="0.01"></div><button type="submit" class="w-full btn bg-green-600 text-white hover:bg-green-700 py-2">Add Fund</button></form><div class="card"><h3 class="text-lg font-semibold p-6">Received Funds History</h3><div class="overflow-x-auto"><table class="w-full"><thead><tr class="border-b"><th class="p-4 text-left font-semibold">Date</th><th class="p-4 text-left font-semibold">Project</th><th class="p-4 text-right font-semibold">Amount</th></tr></thead><tbody id="received-history-table" class="divide-y divide-gray-200"></tbody></table></div></div></section>
+                        <section><h2 class="text-2xl font-semibold text-gray-700 mb-4 pb-2 border-b">Fund Spent</h2><form id="fund-spent-form" class="card p-6 mb-6 space-y-4"><div><label for="spent-date" class="block text-sm font-medium text-gray-700">Date</label><input type="date" id="spent-date" class="form-input mt-1 block w-full p-2" required></div><div><label for="spent-project" class="block text-sm font-medium text-gray-700">For Project</label><select id="spent-project" class="form-input mt-1 block w-full p-2" required></select></div><div><label for="spent-supplier" class="block text-sm font-medium text-gray-700">Supplier</label><input type="text" id="spent-supplier" placeholder="e.g., Hardware Store" class="form-input mt-1 block w-full p-2"></div><div><label for="spent-description" class="block text-sm font-medium text-gray-700">Description</label><input type="text" id="spent-description" placeholder="e.g., Cement, tools" class="form-input mt-1 block w-full p-2" required></div><div><label for="spent-amount" class="block text-sm font-medium text-gray-700">Amount</label><input type="number" id="spent-amount" placeholder="0.00" class="form-input mt-1 block w-full p-2" required min="0.01" step="0.01"></div><button type="submit" class="w-full btn bg-red-600 text-white hover:bg-red-700 py-2">Add Expense</button></form><div class="card"><h3 class="text-lg font-semibold p-6">Spending History</h3><div class="overflow-x-auto"><table class="w-full"><thead><tr class="border-b"><th class="p-4 text-left font-semibold">Date</th><th class="p-4 text-left font-semibold">Item</th><th class="p-4 text-right font-semibold">Amount</th></tr></thead><tbody id="spent-history-table" class="divide-y divide-gray-200"></tbody></table></div></div></section>
+                    </div>
+                    <section><h2 class="text-2xl font-semibold text-gray-700 mb-4 pb-2 border-b">Project Fund Summary</h2><div class="card"><div class="overflow-x-auto"><table class="w-full"><thead><tr class="border-b"><th class="p-4 text-left font-semibold">Project</th><th class="p-4 text-right font-semibold">Allocated</th><th class="p-4 text-right font-semibold">Spent</th><th class="p-4 text-right font-semibold">Remaining</th></tr></thead><tbody id="project-fund-summary-table" class="divide-y divide-gray-200"></tbody></table></div></div></section>
+                </div>
+            </div>
+            
+            <div id="requests" class="tab-content hidden">
+                <h1 class="text-4xl font-bold text-gray-900 mb-8">Leave Requests</h1>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-1">
+                        <div class="card p-6">
+                            <h2 class="text-xl font-semibold text-gray-900 mb-4">Submit a Request</h2>
+                            <form id="leave-request-form" class="space-y-4">
+                                <div class="relative">
+                                    <label class="block text-sm font-medium text-gray-700">Requestee</label>
+                                    <input type="text" id="request-search-input" placeholder="Type name or number..." class="form-input w-full p-3 mt-1" autocomplete="off">
+                                    <div id="request-suggestions" class="absolute z-10 w-full bg-white border rounded-lg mt-1 max-h-48 overflow-y-auto hidden"></div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div><label class="block text-sm font-medium text-gray-700">Start Date</label><input type="date" id="leave-start-date" class="form-input w-full p-3 mt-1"></div>
+                                    <div><label class="block text-sm font-medium text-gray-700">End Date</label><input type="date" id="leave-end-date" class="form-input w-full p-3 mt-1"></div>
+                                </div>
+                                <div><label class="block text-sm font-medium text-gray-700">Total Days</label><input type="text" id="leave-total-days" class="form-input w-full p-3 mt-1 bg-gray-100" readonly></div>
+                                <div><label class="block text-sm font-medium text-gray-700">Reason</label><textarea id="leave-reason" class="form-input w-full p-3 mt-1" rows="3"></textarea></div>
+                                <button type="submit" id="submit-leave-request-btn" class="btn btn-primary w-full py-3" disabled>Submit Request</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 card">
+                        <h2 class="text-xl font-semibold text-gray-900 p-6">Request History</h2>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b">
+                                        <th class="p-4 text-left font-semibold">Worker</th>
+                                        <th class="p-4 text-left font-semibold">Dates</th>
+                                        <th class="p-4 text-left font-semibold">Reason</th>
+                                        <th class="p-4 text-left font-semibold">Status</th>
+                                        <th class="p-4 text-left font-semibold">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leave-requests-table" class="divide-y divide-gray-200"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="edit-worker-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><div class="modal-content bg-white p-8 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"><h2 class="text-2xl font-bold mb-6">Edit Worker Information</h2><form id="edit-worker-form"><input type="hidden" name="id"><input type="hidden" name="Photo" id="edit-photo-data-input"><div class="grid grid-cols-1 lg:grid-cols-3 gap-8"><div class="lg:col-span-1"><label class="block text-gray-700 font-medium mb-2">Photo</label><div id="edit-photo-drop-zone" class="photo-drop-zone"><div id="edit-photo-preview-container"><i class="fas fa-cloud-upload-alt text-4xl text-gray-400"></i><p class="text-gray-500 mt-2">Drag, paste, or click</p></div></div><input type="file" id="edit-photo-file-input" class="hidden" accept="image/*"></div><div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6"><div class="sm:col-span-2"><label class="block text-gray-700">Full Name</label><input type="text" name="FullName" class="form-input w-full p-3 mt-1"></div><div><label class="block text-gray-700">Assigned Number</label><input type="text" name="AssignedNumber" class="form-input w-full p-3 mt-1"></div><div><label class="block text-gray-700 font-medium">Trade</label><select name="Trade" class="form-input w-full p-3 mt-1"><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Mason</option><option>Welder</option><option>General Laborer</option></select></div><div><label class="block text-gray-700">Contact Number</label><input type="tel" name="ContactNumber" class="form-input w-full p-3 mt-1"></div><div><label class="block text-gray-700">Birthday</label><input type="date" name="Birthday" class="form-input w-full p-3 mt-1"></div><div><label class="block text-gray-700">Wedding Anniversary</label><input type="date" name="WeddingAnniversary" class="form-input w-full p-3 mt-1"></div><div class="sm:col-span-2"><label class="block text-gray-700">Address</label><textarea name="Address" class="form-input w-full p-3 mt-1" rows="2"></textarea></div><div><label class="block text-gray-700">Marital Status</label><select name="MaritalStatus" class="form-input w-full p-3 mt-1"><option>Single</option><option>Married</option><option>Widowed</option><option>Divorced</option></select></div><div><label class="block text-gray-700">Local Congregation</label><input type="text" name="LocalCongregation" class="form-input w-full p-3 mt-1"></div><div class="sm:col-span-2"><label class="block text-gray-700">Medical Condition (if any)</label><textarea name="MedicalCondition" class="form-input w-full p-3 mt-1" rows="2"></textarea></div><div><label class="block text-gray-700">Emergency Contact Person</label><input type="text" name="EmergencyContactPerson" class="form-input w-full p-3 mt-1"></div><div><label class="block text-gray-700">Emergency Contact Number</label><input type="tel" name="EmergencyContactNumber" class="form-input w-full p-3 mt-1"></div></div></div><div class="mt-8 flex justify-end space-x-4"><button type="button" id="cancel-edit-worker-btn" class="btn btn-secondary px-4 py-2">Cancel</button><button type="submit" class="btn btn-primary px-4 py-2">Save Changes</button></div></form></div></div>
+    <div id="project-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><div class="modal-content bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h2 class="text-2xl font-bold mb-6">Create New Project</h2><form id="project-form" class="space-y-4"><div><label for="project-name" class="block text-sm font-medium text-gray-700">Project Name</label><input type="text" id="project-name" class="form-input mt-1 block w-full p-2" required></div><div><label for="project-area" class="block text-sm font-medium text-gray-700">Project Area (comma-separated)</label><input type="text" id="project-area" class="form-input mt-1 block w-full p-2" required></div><div><label for="project-start-date" class="block text-sm font-medium text-gray-700">Date Started</label><input type="date" id="project-start-date" class="form-input mt-1 block w-full p-2" required></div><div><label for="project-target-date" class="block text-sm font-medium text-gray-700">Target Completion Date</label><input type="date" id="project-target-date" class="form-input mt-1 block w-full p-2" required></div><div><label for="project-status" class="block text-sm font-medium text-gray-700">Status</label><select id="project-status" class="form-input mt-1 block w-full p-2" required><option value="Active">Active</option><option value="Paused">Paused</option><option value="Canceled">Canceled</option></select></div><div class="mt-6 flex justify-end space-x-4"><button type="button" id="cancel-project-btn" class="btn btn-secondary px-4 py-2">Cancel</button><button type="submit" class="btn btn-primary px-4 py-2">Create Project</button></div></form></div></div>
+    <div id="edit-project-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><div class="modal-content bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h2 class="text-2xl font-bold mb-6">Edit Project</h2><form id="edit-project-form" class="space-y-4"><input type="hidden" id="edit-project-id"><div><label for="edit-project-name" class="block text-sm font-medium text-gray-700">Project Name</label><input type="text" id="edit-project-name" class="form-input mt-1 block w-full p-2" required></div><div><label for="edit-project-area" class="block text-sm font-medium text-gray-700">Project Area (comma-separated)</label><input type="text" id="edit-project-area" class="form-input mt-1 block w-full p-2" required></div><div><label for="edit-project-start-date" class="block text-sm font-medium text-gray-700">Date Started</label><input type="date" id="edit-project-start-date" class="form-input mt-1 block w-full p-2" required></div><div><label for="edit-project-target-date" class="block text-sm font-medium text-gray-700">Target Completion Date</label><input type="date" id="edit-project-target-date" class="form-input mt-1 block w-full p-2" required></div><div><label for="edit-project-status" class="block text-sm font-medium text-gray-700">Status</label><select id="edit-project-status" class="form-input mt-1 block w-full p-2" required><option value="Active">Active</option><option value="Paused">Paused</option><option value="Canceled">Canceled</option></select></div><div class="mt-6 flex justify-end space-x-4"><button type="button" id="cancel-edit-project-btn" class="btn btn-secondary px-4 py-2">Cancel</button><button type="submit" class="btn btn-primary px-4 py-2">Save Changes</button></div></form></div></div>
+    <div id="worker-info-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><div class="modal-content bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"><div class="flex justify-between items-start mb-6"><h2 class="text-3xl font-bold text-gray-900" id="info-FullName"></h2><button id="close-info-modal-btn" class="text-gray-400 hover:text-gray-600 text-3xl leading-none">&times;</button></div><div class="flex flex-col md:flex-row gap-8"><div class="flex-shrink-0"><img id="info-Photo" class="w-32 h-32 rounded-lg object-cover bg-gray-200" src="" alt="Worker Photo"></div><div class="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-gray-700"><div><label class="block text-sm font-semibold text-gray-500">Assigned Number</label><p id="info-AssignedNumber"></p></div><div><label class="block text-sm font-semibold text-gray-500">Trade</label><p id="info-Trade"></p></div><div><label class="block text-sm font-medium text-gray-700">Contact Number</label><p id="info-ContactNumber"></p></div><div><label class="block text-sm font-semibold text-gray-500">Birthday</label><p id="info-Birthday"></p></div><div class="sm:col-span-2"><label class="block text-sm font-semibold text-gray-500">Address</label><p id="info-Address"></p></div><div><label class="block text-sm font-semibold text-gray-500">Marital Status</label><p id="info-MaritalStatus"></p></div><div><label class="block text-sm font-semibold text-gray-500">Local Congregation</label><p id="info-LocalCongregation"></p></div><div class="sm:col-span-2"><label class="block text-sm font-semibold text-gray-500">Medical Condition</label><p id="info-MedicalCondition"></p></div><div><label class="block text-sm font-semibold text-gray-500">Emergency Contact</label><p id="info-EmergencyContactPerson"></p></div><div><label class="block text-sm font-semibold text-gray-500">Emergency Number</label><p id="info-EmergencyContactNumber"></p></div></div></div><div class="mt-8 pt-6 border-t flex justify-end space-x-4"><button id="info-edit-btn" class="btn btn-secondary px-4 py-2">Edit Record</button><button id="info-archive-btn" class="btn bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2">Archive Record</button></div></div></div>
+    <div id="excel-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><div class="modal-content bg-white p-8 rounded-lg shadow-xl w-full max-w-3xl"><h2 class="text-2xl font-bold mb-4">Import Excel Data</h2><input type="file" id="excel-file-input" accept=".xlsx, .xls" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-4"/><div id="sheet-selection" class="hidden mb-4"><label for="sheet-selector" class="block text-gray-700 mb-2">Select Sheet:</label><select id="sheet-selector" class="form-input w-full p-2"></select></div><div id="column-mapping" class="hidden"><h3 class="text-xl font-semibold mb-2">Map Columns</h3><p class="text-gray-600 mb-4">Match the Excel columns to the required fields.</p><div id="mapping-fields" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div></div><div class="mt-6 flex justify-end space-x-4"><button id="cancel-import-btn" class="btn btn-secondary px-4 py-2">Cancel</button><button id="process-import-btn" class="btn btn-primary px-4 py-2 disabled:opacity-50" disabled>Process</button></div></div></div>
+    <div id="archive-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4"><div class="modal-content bg-white p-8 rounded-lg shadow-xl w-full max-w-md"><h2 class="text-2xl font-bold mb-2">Archive Worker Record</h2><p class="text-gray-600 mb-6">Select a reason for archiving <strong id="archive-worker-name"></strong>'s record.</p><div class="space-y-4"><label class="flex items-center"><input type="radio" name="archive-reason" value="Death" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"><span class="ml-3 text-gray-700">Death</span></label><label class="flex items-center"><input type="radio" name="archive-reason" value="Termination" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"><span class="ml-3 text-gray-700">Termination</span></label><label class="flex items-center"><input type="radio" name="archive-reason" value="Resignation" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"><span class="ml-3 text-gray-700">Resignation</span></label></div><div class="mt-8 flex justify-end space-x-4"><button id="cancel-archive-btn" class="btn btn-secondary px-4 py-2">Cancel</button><button id="confirm-archive-btn" class="btn bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 px-4 py-2" disabled>Confirm Archive</button></div></div></div>
+    <div id="assignment-project-info-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50 p-4">
+        <div class="modal-content bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-start mb-4">
+                <h2 class="text-3xl font-bold text-gray-900" id="project-info-name"></h2>
+                <button id="close-project-info-modal-btn" class="text-gray-400 hover:text-gray-600 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="project-info-status" class="mb-6"></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-700">
+                <div><label class="block text-sm font-semibold text-gray-500">Project Area(s)</label><p id="project-info-area"></p></div>
+                <div><label class="block text-sm font-semibold text-gray-500">Date Started</label><p id="project-info-start-date"></p></div>
+                <div><label class="block text-sm font-semibold text-gray-500">Target Completion</label><p id="project-info-target-date"></p></div>
+            </div>
+            <div class="mt-8">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Assigned Workers</h3>
+                <div id="project-info-workers-list" class="space-y-2 max-h-64 overflow-y-auto pr-2"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

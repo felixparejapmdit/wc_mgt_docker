@@ -1,9 +1,28 @@
 version: '3'
 
 services:
-  wc_mgt:
+  api:
     build: .
     ports:
-      - "3442:80"
+      - "3442:3004" # Access at http://localhost:3442
     restart: unless-stopped
-    container_name: wc_mgt
+    container_name: wc_mgt_api
+    depends_on:
+      - db
+    env_file:
+      - .env
+
+  db:
+    image: mysql:8.0
+    container_name: wc_mgt_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ""
+      MYSQL_DATABASE: wcm_database
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:

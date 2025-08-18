@@ -1,5 +1,14 @@
 {
+  "name": "wc_v2",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
-    "@directus/sdk": "^20.0.1"
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "mysql2": "^3.14.3"
   }
 }
